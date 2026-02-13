@@ -26,7 +26,6 @@ class ImLivechatChannel(models.Model):
         help='Configure this URL in LINE Developers Console.',
     )
 
-    @api.depends('id')
     def _compute_line_webhook_url(self):
         """Compute the webhook URL for LINE integration."""
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
