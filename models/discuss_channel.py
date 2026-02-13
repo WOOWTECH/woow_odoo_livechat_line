@@ -64,9 +64,10 @@ class DiscussChannel(models.Model):
         for attachment in message.attachment_ids:
             mimetype = attachment.mimetype or ''
             if mimetype.startswith('image/'):
-                # Get public URL for image
+                # Get public URL for image using access token
                 base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
-                image_url = f'{base_url}/web/content/{attachment.id}'
+                # Use access_token for public access without authentication
+                image_url = f'{base_url}/web/image/{attachment.id}?access_token={attachment.access_token}'
                 messages.append(self._line_build_image_message(image_url))
 
         # Send messages to LINE

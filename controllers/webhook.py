@@ -6,6 +6,8 @@ import hmac
 import json
 import logging
 
+from markupsafe import escape
+
 from odoo import http
 from odoo.http import request
 
@@ -51,8 +53,8 @@ class LineWebhookController(http.Controller):
         for event in events:
             try:
                 self._process_event(event, livechat_channel)
-            except Exception as e:
-                _logger.error('LINE webhook: Error processing event: %s', e)
+            except Exception:
+                _logger.exception('LINE webhook [%s]: Error processing event', channel_id)
 
         return {}
 
@@ -176,8 +178,8 @@ class LineWebhookController(http.Controller):
             discuss_channel.write({
                 'line_user_id': line_user_id,
             })
-            # Add guest to channel members
-            discuss_channel._add_guest_to_channel(guest)
+            # Add guest to channel members using Odoo 18 API
+            discuss_channel.add_members(guest_ids=[guest.id])
 
         return discuss_channel
 
@@ -219,12 +221,13 @@ class LineWebhookController(http.Controller):
             body = f'[Sticker: {package_id}/{sticker_id}]'
 
         elif message_type == 'location':
-            title = message.get('title', '')
-            address = message.get('address', '')
+            # Escape user-provided content to prevent XSS
+            title = escape(message.get('title', ''))
+            address = escape(message.get('address', ''))
             latitude = message.get('latitude')
             longitude = message.get('longitude')
             maps_url = f'https://www.google.com/maps?q={latitude},{longitude}'
-            body = f'📍 {title}\n{address}\n<a href="{maps_url}">View on Google Maps</a>'
+            body = f'📍 {title}<br/>{address}<br/><a href="{maps_url}">View on Google Maps</a>'
 
         else:
             body = f'[Unsupported message type: {message_type}]'

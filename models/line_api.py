@@ -2,6 +2,7 @@
 
 import json
 import logging
+import time
 import requests
 
 from odoo import api, models
@@ -10,6 +11,11 @@ _logger = logging.getLogger(__name__)
 
 LINE_API_BASE_URL = 'https://api.line.me/v2'
 LINE_DATA_API_BASE_URL = 'https://api-data.line.me/v2'
+
+# Token cache: {channel_id: {'token': str, 'expires_at': float}}
+_token_cache = {}
+# Token validity buffer (refresh 5 minutes before expiry)
+TOKEN_EXPIRY_BUFFER = 300
 
 
 class LineApiMixin(models.AbstractModel):
@@ -20,6 +26,9 @@ class LineApiMixin(models.AbstractModel):
     def _line_get_access_token(self, channel_id, channel_secret):
         """Get LINE access token using Channel ID and Secret.
 
+        Uses in-memory cache to avoid repeated API calls. LINE tokens
+        are valid for 30 days, but we refresh 5 minutes before expiry.
+
         Args:
             channel_id: LINE Channel ID.
             channel_secret: LINE Channel Secret.
@@ -27,6 +36,14 @@ class LineApiMixin(models.AbstractModel):
         Returns:
             str: Access token or None on failure.
         """
+        global _token_cache
+
+        # Check cache first
+        cached = _token_cache.get(channel_id)
+        if cached and cached['expires_at'] > time.time():
+            return cached['token']
+
+        # Request new token
         url = 'https://api.line.me/v2/oauth/accessToken'
         data = {
             'grant_type': 'client_credentials',
@@ -37,7 +54,18 @@ class LineApiMixin(models.AbstractModel):
         try:
             response = requests.post(url, data=data, timeout=30)
             response.raise_for_status()
-            return response.json().get('access_token')
+            result = response.json()
+            access_token = result.get('access_token')
+            # LINE tokens are valid for 30 days (2592000 seconds)
+            expires_in = result.get('expires_in', 2592000)
+
+            # Cache the token
+            _token_cache[channel_id] = {
+                'token': access_token,
+                'expires_at': time.time() + expires_in - TOKEN_EXPIRY_BUFFER,
+            }
+            _logger.info('LINE API: Access token refreshed for channel %s', channel_id)
+            return access_token
         except requests.exceptions.RequestException as e:
             _logger.error('LINE API: Failed to get access token: %s', e)
             return None

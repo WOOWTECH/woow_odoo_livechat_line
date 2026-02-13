@@ -1,6 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class ImLivechatChannel(models.Model):
@@ -25,6 +26,20 @@ class ImLivechatChannel(models.Model):
         compute='_compute_line_webhook_url',
         help='Configure this URL in LINE Developers Console.',
     )
+
+    @api.constrains('line_enabled', 'line_channel_id', 'line_channel_secret')
+    def _check_line_config(self):
+        """Validate LINE configuration when enabled."""
+        for record in self:
+            if record.line_enabled:
+                if not record.line_channel_id:
+                    raise ValidationError(
+                        "LINE Channel ID is required when LINE integration is enabled."
+                    )
+                if not record.line_channel_secret:
+                    raise ValidationError(
+                        "LINE Channel Secret is required when LINE integration is enabled."
+                    )
 
     def _compute_line_webhook_url(self):
         """Compute the webhook URL for LINE integration."""
