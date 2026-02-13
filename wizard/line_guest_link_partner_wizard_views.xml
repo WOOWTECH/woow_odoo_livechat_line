@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="line_guest_link_partner_wizard_form" model="ir.ui.view">
+        <field name="name">line.guest.link.partner.wizard.form</field>
+        <field name="model">line.guest.link.partner.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Link to Contact">
+                <group>
+                    <field name="guest_id" invisible="1"/>
+                    <field name="partner_id" options="{'no_create': True}"/>
+                </group>
+                <footer>
+                    <button string="Link" type="object" name="action_link" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
