@@ -33,6 +33,9 @@ class LineWebhookController(http.Controller):
         Returns:
             dict: Empty dict on success (LINE expects 200 OK).
         """
+        _logger.info('LINE webhook: Received request for channel_id=%s', channel_id)
+        _logger.info('LINE webhook: Headers=%s', dict(request.httprequest.headers))
+
         livechat_channel = request.env['im_livechat.channel'].sudo().browse(channel_id)
         if not livechat_channel.exists() or not livechat_channel.line_enabled:
             _logger.warning('LINE webhook: Invalid or disabled channel %s', channel_id)
@@ -42,8 +45,11 @@ class LineWebhookController(http.Controller):
         body = request.httprequest.get_data(as_text=True)
         signature = request.httprequest.headers.get('X-Line-Signature', '')
 
+        _logger.info('LINE webhook: Body length=%s, signature=%s', len(body), signature[:20] if signature else 'None')
+
         if not self._verify_signature(body, signature, livechat_channel.line_channel_secret):
             _logger.warning('LINE webhook: Invalid signature for channel %s', channel_id)
+            _logger.warning('LINE webhook: Body=%s', body[:200] if body else 'None')
             return {}
 
         # Process events
