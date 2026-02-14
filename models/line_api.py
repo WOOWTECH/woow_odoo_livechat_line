@@ -281,13 +281,13 @@ class LineApiMixin(models.AbstractModel):
         if '.' in filename:
             ext = filename.rsplit('.', 1)[-1].upper()[:4]
 
-        # Match LINE official file card style - nano bubble with extension badge
+        # Match LINE official file card style - kilo bubble with extension badge
         return {
             'type': 'flex',
             'altText': filename,
             'contents': {
                 'type': 'bubble',
-                'size': 'nano',
+                'size': 'kilo',
                 'body': {
                     'type': 'box',
                     'layout': 'horizontal',
