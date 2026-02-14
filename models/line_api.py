@@ -276,7 +276,12 @@ class LineApiMixin(models.AbstractModel):
         # Truncate filename if too long
         display_name = filename if len(filename) <= 28 else filename[:25] + '...'
 
-        # Match LINE official file card style - compact nano bubble
+        # Get file extension for display (e.g., PDF, DOC, XLS)
+        ext = 'FILE'
+        if '.' in filename:
+            ext = filename.rsplit('.', 1)[-1].upper()[:4]
+
+        # Match LINE official file card style - nano bubble with extension badge
         return {
             'type': 'flex',
             'altText': filename,
@@ -293,10 +298,12 @@ class LineApiMixin(models.AbstractModel):
                             'contents': [
                                 {
                                     'type': 'text',
-                                    'text': '📄',
-                                    'size': 'xl',
+                                    'text': ext,
+                                    'size': 'xs',
+                                    'color': '#FFFFFF',
                                     'align': 'center',
                                     'gravity': 'center',
+                                    'weight': 'bold',
                                 }
                             ],
                             'width': '45px',
