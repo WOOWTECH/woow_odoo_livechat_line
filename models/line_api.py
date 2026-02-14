@@ -273,18 +273,16 @@ class LineApiMixin(models.AbstractModel):
                 size_mb = file_size / (1024 * 1024)
                 size_text = f'{size_mb:.1f} MB'
 
-        # Get file extension for display
-        ext = 'FILE'
-        if '.' in filename:
-            ext = filename.rsplit('.', 1)[-1].upper()[:4]
+        # Truncate filename if too long
+        display_name = filename if len(filename) <= 28 else filename[:25] + '...'
 
-        # Match LINE official file card style exactly
+        # Match LINE official file card style - compact nano bubble
         return {
             'type': 'flex',
             'altText': filename,
             'contents': {
                 'type': 'bubble',
-                'size': 'micro',
+                'size': 'nano',
                 'body': {
                     'type': 'box',
                     'layout': 'horizontal',
@@ -295,17 +293,16 @@ class LineApiMixin(models.AbstractModel):
                             'contents': [
                                 {
                                     'type': 'text',
-                                    'text': ext,
-                                    'size': 'xxs',
-                                    'color': '#FFFFFF',
+                                    'text': '📄',
+                                    'size': 'xl',
                                     'align': 'center',
-                                    'weight': 'bold',
+                                    'gravity': 'center',
                                 }
                             ],
-                            'width': '40px',
-                            'height': '40px',
-                            'backgroundColor': '#7D7D7D',
-                            'cornerRadius': '4px',
+                            'width': '45px',
+                            'height': '45px',
+                            'backgroundColor': '#5B6B7C',
+                            'cornerRadius': '6px',
                             'justifyContent': 'center',
                             'alignItems': 'center',
                         },
@@ -315,24 +312,25 @@ class LineApiMixin(models.AbstractModel):
                             'contents': [
                                 {
                                     'type': 'text',
-                                    'text': filename if len(filename) <= 25 else filename[:22] + '...',
+                                    'text': display_name,
                                     'size': 'xs',
-                                    'color': '#000000',
+                                    'color': '#111111',
+                                    'wrap': False,
                                 },
                                 {
                                     'type': 'text',
                                     'text': size_text if size_text else 'File',
                                     'size': 'xxs',
-                                    'color': '#AAAAAA',
-                                    'margin': 'xs',
+                                    'color': '#8C8C8C',
+                                    'margin': 'sm',
                                 }
                             ],
                             'flex': 1,
-                            'margin': 'lg',
+                            'margin': 'md',
                             'justifyContent': 'center',
                         }
                     ],
-                    'paddingAll': 'lg',
+                    'paddingAll': 'md',
                     'action': {
                         'type': 'uri',
                         'uri': file_url,
