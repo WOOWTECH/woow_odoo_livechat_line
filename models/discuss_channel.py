@@ -66,56 +66,74 @@ class DiscussChannel(models.Model):
         # Process attachments
         for attachment in message.attachment_ids:
             mimetype = attachment.mimetype or ''
-            # Build public URL with access_token
-            attachment_url = f'{base_url}/web/content/{attachment.id}?access_token={attachment.access_token}'
 
-            _logger.info('LINE: Processing attachment id=%s, name=%s, mimetype=%s',
-                        attachment.id, attachment.name, mimetype)
+            _logger.info('LINE: Processing attachment id=%s, name=%s, mimetype=%s, access_token=%s',
+                        attachment.id, attachment.name, mimetype, attachment.access_token[:10] if attachment.access_token else 'None')
 
             if mimetype.startswith('image/'):
-                # Image message
-                # LINE requires HTTPS URLs - convert if needed
-                image_url = self._ensure_https_url(attachment_url)
+                # Image message - use /web/image/ endpoint for better compatibility
+                image_url = f'{base_url}/web/image/{attachment.id}?access_token={attachment.access_token}'
+                image_url = self._ensure_https_url(image_url)
                 if image_url:
+                    _logger.info('LINE: Sending image URL=%s', image_url)
                     messages.append(self._line_build_image_message(image_url))
                 else:
-                    _logger.warning('LINE: Cannot send image - URL must be HTTPS: %s', attachment_url)
+                    _logger.warning('LINE: Cannot send image - URL must be HTTPS')
+                    # Fallback: send as text link
+                    messages.append(self._line_build_text_message(
+                        f'🖼️ Image: {attachment.name}\n{base_url}/web/image/{attachment.id}'
+                    ))
 
             elif mimetype.startswith('video/'):
                 # Video message - needs preview image
-                video_url = self._ensure_https_url(attachment_url)
+                video_url = f'{base_url}/web/content/{attachment.id}?access_token={attachment.access_token}'
+                video_url = self._ensure_https_url(video_url)
                 if video_url:
-                    # Use a default preview or generate one
-                    preview_url = f'{base_url}/woow_odoo_livechat_line/static/img/video_preview.png'
+                    # Use a default preview
+                    preview_url = f'{base_url}/woow_odoo_livechat_line/static/img/video_preview.svg'
                     preview_url = self._ensure_https_url(preview_url) or video_url
+                    _logger.info('LINE: Sending video URL=%s, preview=%s', video_url, preview_url)
                     messages.append(self._line_build_video_message(video_url, preview_url))
                 else:
-                    _logger.warning('LINE: Cannot send video - URL must be HTTPS: %s', attachment_url)
+                    _logger.warning('LINE: Cannot send video - URL must be HTTPS')
+                    messages.append(self._line_build_text_message(
+                        f'🎬 Video: {attachment.name}\n{base_url}/web/content/{attachment.id}'
+                    ))
 
             elif mimetype.startswith('audio/'):
                 # Audio message - estimate duration (LINE requires it)
-                audio_url = self._ensure_https_url(attachment_url)
+                audio_url = f'{base_url}/web/content/{attachment.id}?access_token={attachment.access_token}'
+                audio_url = self._ensure_https_url(audio_url)
                 if audio_url:
-                    # Default duration of 60 seconds if unknown
-                    duration_ms = 60000
+                    duration_ms = 60000  # Default 60 seconds
+                    _logger.info('LINE: Sending audio URL=%s', audio_url)
                     messages.append(self._line_build_audio_message(audio_url, duration_ms))
                 else:
-                    _logger.warning('LINE: Cannot send audio - URL must be HTTPS: %s', attachment_url)
+                    _logger.warning('LINE: Cannot send audio - URL must be HTTPS')
+                    messages.append(self._line_build_text_message(
+                        f'🎵 Audio: {attachment.name}\n{base_url}/web/content/{attachment.id}'
+                    ))
 
             else:
-                # Other files - use Flex Message with download link
-                file_url = self._ensure_https_url(attachment_url)
-                if file_url:
-                    messages.append(self._line_build_file_message(
-                        attachment.name,
-                        file_url,
-                        attachment.file_size,
-                    ))
-                else:
-                    # Fallback to text link if no HTTPS
-                    messages.append(self._line_build_text_message(
-                        f'📎 File: {attachment.name}\n{attachment_url}'
-                    ))
+                # Other files - send as text link with download URL
+                # Flex Message may have compatibility issues, use simple text instead
+                file_url = f'{base_url}/web/content/{attachment.id}?access_token={attachment.access_token}&download=true'
+                file_url = self._ensure_https_url(file_url)
+
+                # Format file size
+                size_text = ''
+                if attachment.file_size:
+                    if attachment.file_size < 1024:
+                        size_text = f' ({attachment.file_size} B)'
+                    elif attachment.file_size < 1024 * 1024:
+                        size_text = f' ({attachment.file_size // 1024} KB)'
+                    else:
+                        size_text = f' ({attachment.file_size // (1024 * 1024)} MB)'
+
+                _logger.info('LINE: Sending file as text link, name=%s, url=%s', attachment.name, file_url)
+                messages.append(self._line_build_text_message(
+                    f'📎 {attachment.name}{size_text}\n{file_url}'
+                ))
 
         # Send messages to LINE (max 5 messages per push)
         if messages:

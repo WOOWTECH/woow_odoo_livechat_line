@@ -91,14 +91,22 @@ class LineApiMixin(models.AbstractModel):
             'messages': messages,
         }
 
+        _logger.info('LINE API: Pushing %s messages to user %s', len(messages), line_user_id)
+        _logger.info('LINE API: Message types: %s', [m.get('type') for m in messages])
+
         try:
             response = requests.post(
                 url, headers=headers, json=data, timeout=30
             )
+            _logger.info('LINE API: Push response status=%s', response.status_code)
+            if response.status_code != 200:
+                _logger.error('LINE API: Push failed, response=%s', response.text[:500] if response.text else '')
             response.raise_for_status()
             return True
         except requests.exceptions.RequestException as e:
             _logger.error('LINE API: Failed to push message: %s', e)
+            if hasattr(e, 'response') and e.response is not None:
+                _logger.error('LINE API: Error response=%s', e.response.text[:500] if e.response.text else '')
             return False
 
     def _line_get_profile(self, access_token, line_user_id):
