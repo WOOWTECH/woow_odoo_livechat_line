@@ -169,17 +169,41 @@ class LineWebhookController(http.Controller):
         ], limit=1)
 
         if not discuss_channel:
-            # Create new livechat channel using Odoo's standard method
-            discuss_channel = livechat_channel._open_livechat_mail_channel(
+            # Get channel values using Odoo 18 API
+            channel_vals = livechat_channel._get_livechat_discuss_channel_vals(
                 anonymous_name=guest.name,
-                previous_operator_id=False,
-                persisted=True,
+                previous_operator_id=None,
+                chatbot_script=None,
+                user_id=None,
+                country_id=None,
             )
+
+            if not channel_vals:
+                _logger.warning('LINE webhook: No available operator for channel %s', livechat_channel.id)
+                # Create channel without operator assignment
+                channel_vals = {
+                    'channel_type': 'livechat',
+                    'livechat_channel_id': livechat_channel.id,
+                    'livechat_active': True,
+                    'anonymous_name': guest.name,
+                    'name': f'LINE: {guest.name}',
+                }
+
+            # Create the discuss channel
+            discuss_channel = DiscussChannel.with_context(
+                mail_create_nosubscribe=False
+            ).create(channel_vals)
+
+            # Add LINE user ID
             discuss_channel.write({
                 'line_user_id': line_user_id,
             })
-            # Add guest to channel members using Odoo 18 API
+
+            # Add guest to channel members
             discuss_channel.add_members(guest_ids=[guest.id])
+
+            _logger.info('LINE webhook: Created new discuss channel %s for LINE user %s',
+                        discuss_channel.id, line_user_id)
 
         return discuss_channel
 
