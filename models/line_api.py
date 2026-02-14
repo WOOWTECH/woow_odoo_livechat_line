@@ -273,11 +273,6 @@ class LineApiMixin(models.AbstractModel):
                 size_mb = file_size / (1024 * 1024)
                 size_text = f'{size_mb:.1f} MB'
 
-        # Get file extension for icon
-        ext = ''
-        if '.' in filename:
-            ext = filename.rsplit('.', 1)[-1].upper()
-
         return {
             'type': 'flex',
             'altText': f'📎 {filename}',
@@ -295,11 +290,15 @@ class LineApiMixin(models.AbstractModel):
                                 {
                                     'type': 'text',
                                     'text': '📄',
-                                    'size': 'xxl',
+                                    'size': '3xl',
                                     'align': 'center',
+                                    'gravity': 'center',
                                 }
                             ],
-                            'width': '50px',
+                            'width': '60px',
+                            'height': '60px',
+                            'backgroundColor': '#E8E8E8',
+                            'cornerRadius': '8px',
                             'alignItems': 'center',
                             'justifyContent': 'center',
                         },
@@ -311,27 +310,34 @@ class LineApiMixin(models.AbstractModel):
                                     'type': 'text',
                                     'text': filename,
                                     'size': 'sm',
-                                    'weight': 'bold',
+                                    'color': '#111111',
                                     'wrap': True,
                                     'maxLines': 2,
                                 },
                                 {
                                     'type': 'text',
-                                    'text': size_text if size_text else ext,
+                                    'text': size_text if size_text else 'File',
                                     'size': 'xs',
-                                    'color': '#888888',
+                                    'color': '#999999',
                                     'margin': 'sm',
                                 }
                             ],
                             'flex': 1,
+                            'paddingStart': 'lg',
                             'justifyContent': 'center',
                         }
                     ],
                     'paddingAll': 'lg',
+                    'backgroundColor': '#FFFFFF',
                     'action': {
                         'type': 'uri',
                         'uri': file_url,
                     },
                 },
+                'styles': {
+                    'body': {
+                        'backgroundColor': '#FFFFFF'
+                    }
+                }
             },
         }
