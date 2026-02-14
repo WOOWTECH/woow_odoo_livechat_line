@@ -33,10 +33,26 @@
 - 而且 `create_uid` 必須是當前用戶
 - 我們創建的附件不符合這些條件，所以被過濾掉了
 
-### 修復方案
+### 修復方案 (LINE → Odoo)
 - 改用 `attachments` 參數而不是 `attachment_ids`
 - `attachments` 接受 `[(filename, content)]` 格式的元組列表
 - 這樣可以繞過過濾器，讓 Odoo 自動創建並關聯附件
+
+### 發現 6: [已實作] Odoo → LINE 媒體傳送
+實作了完整的 Odoo → LINE 媒體傳送支援：
+
+**支援的媒體類型：**
+1. **圖片** (image/*) - 使用 LINE Image Message
+2. **視頻** (video/*) - 使用 LINE Video Message
+3. **音頻** (audio/*) - 使用 LINE Audio Message
+4. **其他檔案** - 使用 LINE Flex Message 提供下載連結
+
+**LINE API 要求：**
+- 所有媒體 URL 必須是 HTTPS
+- 圖片: JPEG/PNG, max 10MB
+- 視頻: MP4, max 200MB, 需要預覽圖
+- 音頻: M4A, max 200MB, 需要時長(ms)
+- LINE 不支援原生檔案訊息，使用 Flex Message 作為替代
 
 ## 代碼審查
 

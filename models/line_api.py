@@ -176,8 +176,8 @@ class LineApiMixin(models.AbstractModel):
         """Build LINE image message object.
 
         Args:
-            original_url: Original image URL.
-            preview_url: Preview image URL (optional).
+            original_url: Original image URL (must be HTTPS, JPEG/PNG, max 10MB).
+            preview_url: Preview image URL (optional, max 1MB).
 
         Returns:
             dict: LINE message object.
@@ -186,4 +186,104 @@ class LineApiMixin(models.AbstractModel):
             'type': 'image',
             'originalContentUrl': original_url,
             'previewImageUrl': preview_url or original_url,
+        }
+
+    def _line_build_video_message(self, original_url, preview_url):
+        """Build LINE video message object.
+
+        Args:
+            original_url: Video URL (must be HTTPS, MP4, max 200MB).
+            preview_url: Preview image URL (must be HTTPS, JPEG/PNG, max 1MB).
+
+        Returns:
+            dict: LINE message object.
+        """
+        return {
+            'type': 'video',
+            'originalContentUrl': original_url,
+            'previewImageUrl': preview_url,
+        }
+
+    def _line_build_audio_message(self, original_url, duration_ms):
+        """Build LINE audio message object.
+
+        Args:
+            original_url: Audio URL (must be HTTPS, M4A, max 200MB).
+            duration_ms: Duration in milliseconds.
+
+        Returns:
+            dict: LINE message object.
+        """
+        return {
+            'type': 'audio',
+            'originalContentUrl': original_url,
+            'duration': duration_ms,
+        }
+
+    def _line_build_file_message(self, filename, file_url, file_size=None):
+        """Build LINE Flex Message for file download.
+
+        LINE doesn't support native file messages, so we use Flex Message
+        to provide a download link.
+
+        Args:
+            filename: Name of the file.
+            file_url: URL to download the file.
+            file_size: Optional file size in bytes.
+
+        Returns:
+            dict: LINE Flex message object.
+        """
+        size_text = ''
+        if file_size:
+            if file_size < 1024:
+                size_text = f' ({file_size} B)'
+            elif file_size < 1024 * 1024:
+                size_text = f' ({file_size // 1024} KB)'
+            else:
+                size_text = f' ({file_size // (1024 * 1024)} MB)'
+
+        return {
+            'type': 'flex',
+            'altText': f'File: {filename}',
+            'contents': {
+                'type': 'bubble',
+                'size': 'kilo',
+                'body': {
+                    'type': 'box',
+                    'layout': 'vertical',
+                    'contents': [
+                        {
+                            'type': 'text',
+                            'text': '📎 File',
+                            'weight': 'bold',
+                            'size': 'sm',
+                            'color': '#1DB446',
+                        },
+                        {
+                            'type': 'text',
+                            'text': filename + size_text,
+                            'size': 'sm',
+                            'wrap': True,
+                            'margin': 'md',
+                        },
+                    ],
+                },
+                'footer': {
+                    'type': 'box',
+                    'layout': 'vertical',
+                    'contents': [
+                        {
+                            'type': 'button',
+                            'action': {
+                                'type': 'uri',
+                                'label': 'Download',
+                                'uri': file_url,
+                            },
+                            'style': 'primary',
+                            'height': 'sm',
+                        },
+                    ],
+                },
+            },
         }
