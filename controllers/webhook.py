@@ -125,6 +125,10 @@ class LineWebhookController(http.Controller):
             line_user_id, guest, livechat_channel
         )
 
+        if not discuss_channel:
+            _logger.error('LINE webhook: Failed to create discuss channel for user %s', line_user_id)
+            return
+
         # Process message based on type
         self._create_message(message, message_type, discuss_channel, guest)
 
@@ -180,13 +184,23 @@ class LineWebhookController(http.Controller):
 
             if not channel_vals:
                 _logger.warning('LINE webhook: No available operator for channel %s', livechat_channel.id)
-                # Create channel without operator assignment
+                # Get first operator from the livechat channel as fallback
+                fallback_operator = livechat_channel.user_ids[:1]
+                if not fallback_operator:
+                    _logger.error('LINE webhook: No operators configured for channel %s', livechat_channel.id)
+                    return None
+
+                operator_partner_id = fallback_operator.partner_id.id
                 channel_vals = {
                     'channel_type': 'livechat',
                     'livechat_channel_id': livechat_channel.id,
                     'livechat_active': True,
+                    'livechat_operator_id': operator_partner_id,
                     'anonymous_name': guest.name,
                     'name': f'LINE: {guest.name}',
+                    'channel_member_ids': [
+                        (0, 0, {'partner_id': operator_partner_id}),
+                    ],
                 }
 
             # Create the discuss channel
