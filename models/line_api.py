@@ -132,20 +132,31 @@ class LineApiMixin(models.AbstractModel):
             message_id: LINE message ID.
 
         Returns:
-            bytes: Content data or None on failure.
+            tuple: (bytes content, str content_type) or (None, None) on failure.
         """
         url = f'{LINE_DATA_API_BASE_URL}/bot/message/{message_id}/content'
         headers = {
             'Authorization': f'Bearer {access_token}',
         }
 
+        _logger.info('LINE API: Fetching content from %s', url)
+
         try:
             response = requests.get(url, headers=headers, timeout=60)
+            _logger.info('LINE API: Content response status=%s, content-type=%s, size=%s',
+                        response.status_code,
+                        response.headers.get('Content-Type', 'unknown'),
+                        len(response.content) if response.content else 0)
             response.raise_for_status()
-            return response.content
+            content_type = response.headers.get('Content-Type', 'application/octet-stream')
+            return response.content, content_type
         except requests.exceptions.RequestException as e:
             _logger.error('LINE API: Failed to get content: %s', e)
-            return None
+            if hasattr(e, 'response') and e.response is not None:
+                _logger.error('LINE API: Response status=%s, body=%s',
+                             e.response.status_code,
+                             e.response.text[:500] if e.response.text else '')
+            return None, None
 
     def _line_build_text_message(self, text):
         """Build LINE text message object.

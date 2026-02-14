@@ -305,6 +305,9 @@ class LineWebhookController(http.Controller):
         Returns:
             ir.attachment record or None.
         """
+        _logger.info('LINE webhook: Starting content download for message_id=%s, type=%s',
+                    message_id, message_type)
+
         # Get access token
         access_token = livechat_channel._line_get_access_token(
             livechat_channel.line_channel_id,
@@ -314,28 +317,58 @@ class LineWebhookController(http.Controller):
             _logger.error('LINE webhook: Failed to get access token for content download')
             return None
 
-        # Download content
-        content = livechat_channel._line_get_content(access_token, message_id)
-        if not content:
+        _logger.info('LINE webhook: Got access token, downloading content...')
+
+        # Download content (now returns tuple)
+        result = livechat_channel._line_get_content(access_token, message_id)
+        if result is None or (isinstance(result, tuple) and result[0] is None):
             _logger.error('LINE webhook: Failed to download content %s', message_id)
             return None
 
-        # Determine filename and mimetype
-        if message_type == 'image':
-            filename = f'line_image_{message_id}.jpg'
-            mimetype = 'image/jpeg'
-        elif message_type == 'video':
-            filename = f'line_video_{message_id}.mp4'
-            mimetype = 'video/mp4'
-        elif message_type == 'audio':
-            filename = f'line_audio_{message_id}.m4a'
-            mimetype = 'audio/m4a'
-        elif message_type == 'file':
-            filename = message.get('fileName', f'line_file_{message_id}')
-            mimetype = 'application/octet-stream'
+        # Handle both old (bytes) and new (tuple) return format
+        if isinstance(result, tuple):
+            content, content_type = result
         else:
-            filename = f'line_content_{message_id}'
-            mimetype = 'application/octet-stream'
+            content = result
+            content_type = None
+
+        _logger.info('LINE webhook: Downloaded content, size=%s bytes, content_type=%s',
+                    len(content) if content else 0, content_type)
+
+        # Determine filename and mimetype from content_type or message_type
+        if content_type:
+            # Use actual content type from LINE response
+            mimetype = content_type
+            # Determine extension from mimetype
+            ext_map = {
+                'image/jpeg': '.jpg',
+                'image/png': '.png',
+                'image/gif': '.gif',
+                'video/mp4': '.mp4',
+                'audio/m4a': '.m4a',
+                'audio/x-m4a': '.m4a',
+                'audio/mp4': '.m4a',
+                'audio/mpeg': '.mp3',
+            }
+            ext = ext_map.get(mimetype.split(';')[0], '')
+            filename = f'line_{message_type}_{message_id}{ext}'
+        else:
+            # Fallback to message_type based detection
+            if message_type == 'image':
+                filename = f'line_image_{message_id}.jpg'
+                mimetype = 'image/jpeg'
+            elif message_type == 'video':
+                filename = f'line_video_{message_id}.mp4'
+                mimetype = 'video/mp4'
+            elif message_type == 'audio':
+                filename = f'line_audio_{message_id}.m4a'
+                mimetype = 'audio/m4a'
+            elif message_type == 'file':
+                filename = message.get('fileName', f'line_file_{message_id}')
+                mimetype = 'application/octet-stream'
+            else:
+                filename = f'line_content_{message_id}'
+                mimetype = 'application/octet-stream'
 
         # Create attachment
         try:
@@ -345,8 +378,11 @@ class LineWebhookController(http.Controller):
                 'mimetype': mimetype,
                 'public': True,
             })
-            _logger.info('LINE webhook: Created attachment %s for message %s', attachment.id, message_id)
+            _logger.info('LINE webhook: Created attachment id=%s, name=%s, mimetype=%s',
+                        attachment.id, filename, mimetype)
             return attachment
         except Exception as e:
             _logger.error('LINE webhook: Failed to create attachment: %s', e)
+            import traceback
+            _logger.error('LINE webhook: Traceback: %s', traceback.format_exc())
             return None
