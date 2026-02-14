@@ -216,6 +216,10 @@ class LineWebhookController(http.Controller):
             # Add guest to channel members
             discuss_channel.add_members(guest_ids=[guest.id])
 
+            # Broadcast to operator to notify them of new conversation
+            if discuss_channel.livechat_operator_id:
+                discuss_channel._broadcast([discuss_channel.livechat_operator_id.id])
+
             _logger.info('LINE webhook: Created new discuss channel %s for LINE user %s',
                         discuss_channel.id, line_user_id)
 
@@ -274,9 +278,11 @@ class LineWebhookController(http.Controller):
             body = f'[Unsupported message type: {message_type}]'
 
         if body or attachment_ids:
+            _logger.info('LINE webhook: Posting message to channel %s, body=%s, attachments=%s',
+                        discuss_channel.id, body[:50] if body else '', attachment_ids)
             # Use context flag to prevent sending message back to LINE
-            discuss_channel.with_context(
-                mail_create_nosubscribe=True,
+            # Remove mail_create_nosubscribe to allow bus notifications
+            posted_message = discuss_channel.with_context(
                 from_line_webhook=True,  # Prevent message loop
             ).message_post(
                 body=body,
@@ -285,6 +291,7 @@ class LineWebhookController(http.Controller):
                 author_guest_id=guest.id,
                 attachment_ids=attachment_ids,
             )
+            _logger.info('LINE webhook: Message posted successfully, id=%s', posted_message.id)
 
     def _download_line_content(self, message_id, message_type, message, livechat_channel):
         """Download content from LINE and create attachment.
