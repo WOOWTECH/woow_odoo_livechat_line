@@ -130,7 +130,7 @@ class LineWebhookController(http.Controller):
             return
 
         # Process message based on type
-        self._create_message(message, message_type, discuss_channel, guest)
+        self._create_message(message, message_type, discuss_channel, guest, livechat_channel)
 
     def _get_or_create_guest(self, line_user_id, livechat_channel):
         """Get or create a mail.guest record for LINE user.
@@ -221,7 +221,7 @@ class LineWebhookController(http.Controller):
 
         return discuss_channel
 
-    def _create_message(self, message, message_type, discuss_channel, guest):
+    def _create_message(self, message, message_type, discuss_channel, guest, livechat_channel):
         """Create mail.message from LINE message.
 
         Args:
@@ -229,29 +229,32 @@ class LineWebhookController(http.Controller):
             message_type: LINE message type.
             discuss_channel: discuss.channel record.
             guest: mail.guest record.
+            livechat_channel: im_livechat.channel record.
         """
         body = ''
         attachment_ids = []
+        message_id = message.get('id')
 
         if message_type == 'text':
             body = message.get('text', '')
 
-        elif message_type == 'image':
-            body = '[Image]'
-            # TODO: Download and attach image
-
-        elif message_type == 'video':
-            body = '[Video]'
-            # TODO: Download and attach video
-
-        elif message_type == 'audio':
-            body = '[Audio]'
-            # TODO: Download and attach audio
-
-        elif message_type == 'file':
-            file_name = message.get('fileName', 'file')
-            body = f'[File: {file_name}]'
-            # TODO: Download and attach file
+        elif message_type in ('image', 'video', 'audio', 'file'):
+            # Download content from LINE
+            attachment = self._download_line_content(
+                message_id, message_type, message, livechat_channel
+            )
+            if attachment:
+                attachment_ids = [attachment.id]
+                if message_type == 'image':
+                    body = ''  # Image will be shown as attachment
+                elif message_type == 'video':
+                    body = '[Video]'
+                elif message_type == 'audio':
+                    body = '[Audio]'
+                elif message_type == 'file':
+                    body = ''  # File will be shown as attachment
+            else:
+                body = f'[{message_type.capitalize()} - download failed]'
 
         elif message_type == 'sticker':
             sticker_id = message.get('stickerId')
@@ -270,11 +273,73 @@ class LineWebhookController(http.Controller):
         else:
             body = f'[Unsupported message type: {message_type}]'
 
-        if body:
-            discuss_channel.with_context(mail_create_nosubscribe=True).message_post(
+        if body or attachment_ids:
+            # Use context flag to prevent sending message back to LINE
+            discuss_channel.with_context(
+                mail_create_nosubscribe=True,
+                from_line_webhook=True,  # Prevent message loop
+            ).message_post(
                 body=body,
                 message_type='comment',
                 subtype_xmlid='mail.mt_comment',
                 author_guest_id=guest.id,
                 attachment_ids=attachment_ids,
             )
+
+    def _download_line_content(self, message_id, message_type, message, livechat_channel):
+        """Download content from LINE and create attachment.
+
+        Args:
+            message_id: LINE message ID.
+            message_type: LINE message type.
+            message: LINE message dict.
+            livechat_channel: im_livechat.channel record.
+
+        Returns:
+            ir.attachment record or None.
+        """
+        # Get access token
+        access_token = livechat_channel._line_get_access_token(
+            livechat_channel.line_channel_id,
+            livechat_channel.line_channel_secret,
+        )
+        if not access_token:
+            _logger.error('LINE webhook: Failed to get access token for content download')
+            return None
+
+        # Download content
+        content = livechat_channel._line_get_content(access_token, message_id)
+        if not content:
+            _logger.error('LINE webhook: Failed to download content %s', message_id)
+            return None
+
+        # Determine filename and mimetype
+        if message_type == 'image':
+            filename = f'line_image_{message_id}.jpg'
+            mimetype = 'image/jpeg'
+        elif message_type == 'video':
+            filename = f'line_video_{message_id}.mp4'
+            mimetype = 'video/mp4'
+        elif message_type == 'audio':
+            filename = f'line_audio_{message_id}.m4a'
+            mimetype = 'audio/m4a'
+        elif message_type == 'file':
+            filename = message.get('fileName', f'line_file_{message_id}')
+            mimetype = 'application/octet-stream'
+        else:
+            filename = f'line_content_{message_id}'
+            mimetype = 'application/octet-stream'
+
+        # Create attachment
+        try:
+            attachment = request.env['ir.attachment'].sudo().create({
+                'name': filename,
+                'datas': base64.b64encode(content),
+                'mimetype': mimetype,
+                'public': True,
+            })
+            _logger.info('LINE webhook: Created attachment %s for message %s', attachment.id, message_id)
+            return attachment
+        except Exception as e:
+            _logger.error('LINE webhook: Failed to create attachment: %s', e)
+            return None

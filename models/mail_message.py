@@ -16,9 +16,15 @@ class MailMessage(models.Model):
         """Override create to send message to LINE when operator replies."""
         messages = super().create(vals_list)
 
+        # Skip if this message came from LINE webhook (prevent loop)
+        if self.env.context.get('from_line_webhook'):
+            return messages
+
         for message in messages:
             # Only process messages from operators (not from guests)
-            if not message.author_guest_id and message.author_id:
+            # Also check that it's a real operator message, not a system message
+            if (not message.author_guest_id and message.author_id
+                    and message.message_type == 'comment'):
                 self._send_to_line_if_applicable(message)
 
         return messages
