@@ -67,12 +67,19 @@ class DiscussChannel(models.Model):
         for attachment in message.attachment_ids:
             mimetype = attachment.mimetype or ''
 
+            # Ensure attachment has access_token for public URL access
+            # Odoo doesn't auto-generate access_token, we need to call generate_access_token()
+            if not attachment.access_token:
+                attachment.sudo().generate_access_token()
+                _logger.info('LINE: Generated access_token for attachment id=%s', attachment.id)
+
+            att_token = attachment.access_token
             _logger.info('LINE: Processing attachment id=%s, name=%s, mimetype=%s, access_token=%s',
-                        attachment.id, attachment.name, mimetype, attachment.access_token[:10] if attachment.access_token else 'None')
+                        attachment.id, attachment.name, mimetype, att_token[:10] if att_token else 'None')
 
             if mimetype.startswith('image/'):
                 # Image message - use /web/image/ endpoint for better compatibility
-                image_url = f'{base_url}/web/image/{attachment.id}?access_token={attachment.access_token}'
+                image_url = f'{base_url}/web/image/{attachment.id}?access_token={att_token}'
                 image_url = self._ensure_https_url(image_url)
                 if image_url:
                     _logger.info('LINE: Sending image URL=%s', image_url)
@@ -86,11 +93,11 @@ class DiscussChannel(models.Model):
 
             elif mimetype.startswith('video/'):
                 # Video message - needs preview image
-                video_url = f'{base_url}/web/content/{attachment.id}?access_token={attachment.access_token}'
+                video_url = f'{base_url}/web/content/{attachment.id}?access_token={att_token}'
                 video_url = self._ensure_https_url(video_url)
                 if video_url:
-                    # Use a default preview
-                    preview_url = f'{base_url}/woow_odoo_livechat_line/static/img/video_preview.svg'
+                    # Use a default preview - use first frame or static image
+                    preview_url = f'{base_url}/woow_odoo_livechat_line/static/img/video_preview.png'
                     preview_url = self._ensure_https_url(preview_url) or video_url
                     _logger.info('LINE: Sending video URL=%s, preview=%s', video_url, preview_url)
                     messages.append(self._line_build_video_message(video_url, preview_url))
@@ -102,7 +109,7 @@ class DiscussChannel(models.Model):
 
             elif mimetype.startswith('audio/'):
                 # Audio message - estimate duration (LINE requires it)
-                audio_url = f'{base_url}/web/content/{attachment.id}?access_token={attachment.access_token}'
+                audio_url = f'{base_url}/web/content/{attachment.id}?access_token={att_token}'
                 audio_url = self._ensure_https_url(audio_url)
                 if audio_url:
                     duration_ms = 60000  # Default 60 seconds
@@ -117,7 +124,7 @@ class DiscussChannel(models.Model):
             else:
                 # Other files - send as text link with download URL
                 # Flex Message may have compatibility issues, use simple text instead
-                file_url = f'{base_url}/web/content/{attachment.id}?access_token={attachment.access_token}&download=true'
+                file_url = f'{base_url}/web/content/{attachment.id}?access_token={att_token}&download=true'
                 file_url = self._ensure_https_url(file_url)
 
                 # Format file size
