@@ -122,24 +122,15 @@ class DiscussChannel(models.Model):
                     ))
 
             else:
-                # Other files - send as text link with download URL
-                # Flex Message may have compatibility issues, use simple text instead
+                # Other files - send as Flex Message card (similar to LINE official style)
                 file_url = f'{base_url}/web/content/{attachment.id}?access_token={att_token}&download=true'
                 file_url = self._ensure_https_url(file_url)
 
-                # Format file size
-                size_text = ''
-                if attachment.file_size:
-                    if attachment.file_size < 1024:
-                        size_text = f' ({attachment.file_size} B)'
-                    elif attachment.file_size < 1024 * 1024:
-                        size_text = f' ({attachment.file_size // 1024} KB)'
-                    else:
-                        size_text = f' ({attachment.file_size // (1024 * 1024)} MB)'
-
-                _logger.info('LINE: Sending file as text link, name=%s, url=%s', attachment.name, file_url)
-                messages.append(self._line_build_text_message(
-                    f'📎 {attachment.name}{size_text}\n{file_url}'
+                _logger.info('LINE: Sending file as Flex Message card, name=%s, url=%s', attachment.name, file_url)
+                messages.append(self._line_build_file_message(
+                    attachment.name,
+                    file_url,
+                    attachment.file_size
                 ))
 
         # Send messages to LINE (max 5 messages per push)

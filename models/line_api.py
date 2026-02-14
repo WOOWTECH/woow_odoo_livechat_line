@@ -252,7 +252,7 @@ class LineApiMixin(models.AbstractModel):
         """Build LINE Flex Message for file download.
 
         LINE doesn't support native file messages, so we use Flex Message
-        to provide a download link.
+        to create a file card similar to LINE's official file display.
 
         Args:
             filename: Name of the file.
@@ -262,56 +262,76 @@ class LineApiMixin(models.AbstractModel):
         Returns:
             dict: LINE Flex message object.
         """
+        # Format file size
         size_text = ''
         if file_size:
             if file_size < 1024:
-                size_text = f' ({file_size} B)'
+                size_text = f'{file_size} B'
             elif file_size < 1024 * 1024:
-                size_text = f' ({file_size // 1024} KB)'
+                size_text = f'{file_size // 1024} KB'
             else:
-                size_text = f' ({file_size // (1024 * 1024)} MB)'
+                size_mb = file_size / (1024 * 1024)
+                size_text = f'{size_mb:.1f} MB'
+
+        # Get file extension for icon
+        ext = ''
+        if '.' in filename:
+            ext = filename.rsplit('.', 1)[-1].upper()
 
         return {
             'type': 'flex',
-            'altText': f'File: {filename}',
+            'altText': f'📎 {filename}',
             'contents': {
                 'type': 'bubble',
                 'size': 'kilo',
                 'body': {
                     'type': 'box',
-                    'layout': 'vertical',
+                    'layout': 'horizontal',
                     'contents': [
                         {
-                            'type': 'text',
-                            'text': '📎 File',
-                            'weight': 'bold',
-                            'size': 'sm',
-                            'color': '#1DB446',
+                            'type': 'box',
+                            'layout': 'vertical',
+                            'contents': [
+                                {
+                                    'type': 'text',
+                                    'text': '📄',
+                                    'size': 'xxl',
+                                    'align': 'center',
+                                }
+                            ],
+                            'width': '50px',
+                            'alignItems': 'center',
+                            'justifyContent': 'center',
                         },
                         {
-                            'type': 'text',
-                            'text': filename + size_text,
-                            'size': 'sm',
-                            'wrap': True,
-                            'margin': 'md',
-                        },
+                            'type': 'box',
+                            'layout': 'vertical',
+                            'contents': [
+                                {
+                                    'type': 'text',
+                                    'text': filename,
+                                    'size': 'sm',
+                                    'weight': 'bold',
+                                    'wrap': True,
+                                    'maxLines': 2,
+                                },
+                                {
+                                    'type': 'text',
+                                    'text': size_text if size_text else ext,
+                                    'size': 'xs',
+                                    'color': '#888888',
+                                    'margin': 'sm',
+                                }
+                            ],
+                            'flex': 1,
+                            'justifyContent': 'center',
+                        }
                     ],
-                },
-                'footer': {
-                    'type': 'box',
-                    'layout': 'vertical',
-                    'contents': [
-                        {
-                            'type': 'button',
-                            'action': {
-                                'type': 'uri',
-                                'label': 'Download',
-                                'uri': file_url,
-                            },
-                            'style': 'primary',
-                            'height': 'sm',
-                        },
-                    ],
+                    'paddingAll': 'lg',
+                    'action': {
+                        'type': 'uri',
+                        'uri': file_url,
+                    },
                 },
             },
         }
