@@ -22,8 +22,21 @@
 - 圖片訊息的 body 是空的
 - 表示 _download_line_content() 可能失敗或沒有被調用
 
-### 發現 4: [待調查]
-需要確認實際 LINE 圖片訊息的 webhook payload 和 message_id
+### 發現 4: [已確認] LINE 圖片訊息正確收到
+- message_id: 600969225636413827
+- 類型: image
+- 內容下載成功
+
+### 發現 5: [根本原因] attachment_ids 過濾器問題
+- Odoo 的 `message_post` 中 `attachment_ids` 參數有過濾器
+- 過濾器要求 `res_model` 必須是 `mail.compose.message` 或 `mail.scheduled.message`
+- 而且 `create_uid` 必須是當前用戶
+- 我們創建的附件不符合這些條件，所以被過濾掉了
+
+### 修復方案
+- 改用 `attachments` 參數而不是 `attachment_ids`
+- `attachments` 接受 `[(filename, content)]` 格式的元組列表
+- 這樣可以繞過過濾器，讓 Odoo 自動創建並關聯附件
 
 ## 代碼審查
 

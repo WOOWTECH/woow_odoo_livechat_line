@@ -268,12 +268,15 @@ class LineWebhookController(http.Controller):
             body = message.get('text', '')
 
         elif message_type in ('image', 'video', 'audio', 'file'):
-            # Download content from LINE
-            attachment = self._download_line_content(
+            # Download content from LINE - returns (filename, content, mimetype) tuple
+            download_result = self._download_line_content(
                 message_id, message_type, message, livechat_channel
             )
-            if attachment:
-                attachment_ids = [attachment.id]
+            if download_result:
+                filename, content, mimetype = download_result
+                # Use attachments parameter with (name, content) tuple
+                # This bypasses the filter that blocks attachment_ids
+                attachment_ids = [(filename, content)]
                 if message_type == 'image':
                     body = ''  # Image will be shown as attachment
                 elif message_type == 'video':
@@ -303,10 +306,10 @@ class LineWebhookController(http.Controller):
             body = f'[Unsupported message type: {message_type}]'
 
         if body or attachment_ids:
-            _logger.info('LINE webhook: Posting message to channel %s, body=%s, attachments=%s',
-                        discuss_channel.id, body[:50] if body else '', attachment_ids)
+            _logger.info('LINE webhook: Posting message to channel %s, body=%s, has_attachments=%s',
+                        discuss_channel.id, body[:50] if body else '', bool(attachment_ids))
             # Use context flag to prevent sending message back to LINE
-            # Remove mail_create_nosubscribe to allow bus notifications
+            # Use 'attachments' parameter instead of 'attachment_ids' to bypass filter
             posted_message = discuss_channel.with_context(
                 from_line_webhook=True,  # Prevent message loop
             ).message_post(
@@ -314,12 +317,12 @@ class LineWebhookController(http.Controller):
                 message_type='comment',
                 subtype_xmlid='mail.mt_comment',
                 author_guest_id=guest.id,
-                attachment_ids=attachment_ids,
+                attachments=attachment_ids,  # Changed from attachment_ids to attachments
             )
             _logger.info('LINE webhook: Message posted successfully, id=%s', posted_message.id)
 
     def _download_line_content(self, message_id, message_type, message, livechat_channel):
-        """Download content from LINE and create attachment.
+        """Download content from LINE.
 
         Args:
             message_id: LINE message ID.
@@ -328,7 +331,7 @@ class LineWebhookController(http.Controller):
             livechat_channel: im_livechat.channel record.
 
         Returns:
-            ir.attachment record or None.
+            tuple: (filename, content_bytes, mimetype) or None on failure.
         """
         _logger.info('LINE webhook: Starting content download for message_id=%s, type=%s',
                     message_id, message_type)
@@ -345,7 +348,7 @@ class LineWebhookController(http.Controller):
 
         _logger.info('LINE webhook: Got access token, downloading content...')
 
-        # Download content (now returns tuple)
+        # Download content (returns tuple)
         result = livechat_channel._line_get_content(access_token, message_id)
         if result is None or (isinstance(result, tuple) and result[0] is None):
             _logger.error('LINE webhook: Failed to download content %s', message_id)
@@ -364,7 +367,7 @@ class LineWebhookController(http.Controller):
         # Determine filename and mimetype from content_type or message_type
         if content_type:
             # Use actual content type from LINE response
-            mimetype = content_type
+            mimetype = content_type.split(';')[0]  # Remove charset if present
             # Determine extension from mimetype
             ext_map = {
                 'image/jpeg': '.jpg',
@@ -375,8 +378,9 @@ class LineWebhookController(http.Controller):
                 'audio/x-m4a': '.m4a',
                 'audio/mp4': '.m4a',
                 'audio/mpeg': '.mp3',
+                'application/pdf': '.pdf',
             }
-            ext = ext_map.get(mimetype.split(';')[0], '')
+            ext = ext_map.get(mimetype, '')
             filename = f'line_{message_type}_{message_id}{ext}'
         else:
             # Fallback to message_type based detection
@@ -396,19 +400,9 @@ class LineWebhookController(http.Controller):
                 filename = f'line_content_{message_id}'
                 mimetype = 'application/octet-stream'
 
-        # Create attachment
-        try:
-            attachment = request.env['ir.attachment'].sudo().create({
-                'name': filename,
-                'datas': base64.b64encode(content),
-                'mimetype': mimetype,
-                'public': True,
-            })
-            _logger.info('LINE webhook: Created attachment id=%s, name=%s, mimetype=%s',
-                        attachment.id, filename, mimetype)
-            return attachment
-        except Exception as e:
-            _logger.error('LINE webhook: Failed to create attachment: %s', e)
-            import traceback
-            _logger.error('LINE webhook: Traceback: %s', traceback.format_exc())
-            return None
+        _logger.info('LINE webhook: Prepared content filename=%s, mimetype=%s, size=%s',
+                    filename, mimetype, len(content))
+        _log_to_file(f'_download_line_content: success filename={filename}, size={len(content)}')
+
+        # Return (filename, content) tuple for message_post attachments parameter
+        return (filename, content, mimetype)
