@@ -94,11 +94,31 @@ class LineApiMixin(models.AbstractModel):
         _logger.info('LINE API: Pushing %s messages to user %s', len(messages), line_user_id)
         _logger.info('LINE API: Message types: %s', [m.get('type') for m in messages])
 
+        # Debug: write full request to file
+        try:
+            import datetime
+            with open('/tmp/line_push_debug.log', 'a') as f:
+                f.write(f'\n=== {datetime.datetime.now()} ===\n')
+                f.write(f'URL: {url}\n')
+                f.write(f'User: {line_user_id}\n')
+                f.write(f'Messages:\n{json.dumps(messages, indent=2, ensure_ascii=False)}\n')
+        except Exception as debug_err:
+            _logger.warning('LINE API: Debug log write failed: %s', debug_err)
+
         try:
             response = requests.post(
                 url, headers=headers, json=data, timeout=30
             )
             _logger.info('LINE API: Push response status=%s', response.status_code)
+
+            # Debug: write response
+            try:
+                with open('/tmp/line_push_debug.log', 'a') as f:
+                    f.write(f'Response status: {response.status_code}\n')
+                    f.write(f'Response body: {response.text[:1000] if response.text else "empty"}\n')
+            except Exception:
+                pass
+
             if response.status_code != 200:
                 _logger.error('LINE API: Push failed, response=%s', response.text[:500] if response.text else '')
             response.raise_for_status()
