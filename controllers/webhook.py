@@ -277,14 +277,9 @@ class LineWebhookController(http.Controller):
                 # Use attachments parameter with (name, content) tuple
                 # This bypasses the filter that blocks attachment_ids
                 attachment_ids = [(filename, content)]
-                if message_type == 'image':
-                    body = ''  # Image will be shown as attachment
-                elif message_type == 'video':
-                    body = '[Video]'
-                elif message_type == 'audio':
-                    body = '[Audio]'
-                elif message_type == 'file':
-                    body = ''  # File will be shown as attachment
+                # Leave body empty for all media types - Odoo Discuss
+                # renders attachment cards with proper icons and file viewer
+                body = ''
             else:
                 body = f'[{message_type.capitalize()} - download failed]'
 
@@ -309,15 +304,15 @@ class LineWebhookController(http.Controller):
             _logger.info('LINE webhook: Posting message to channel %s, body=%s, has_attachments=%s',
                         discuss_channel.id, body[:50] if body else '', bool(attachment_ids))
             # Use context flag to prevent sending message back to LINE
-            # Use 'attachments' parameter instead of 'attachment_ids' to bypass filter
+            # Set guest in context so Odoo's message_post picks up author_guest_id
             posted_message = discuss_channel.with_context(
                 from_line_webhook=True,  # Prevent message loop
+                guest=guest,  # Set guest for proper author attribution
             ).message_post(
                 body=body,
                 message_type='comment',
                 subtype_xmlid='mail.mt_comment',
-                author_guest_id=guest.id,
-                attachments=attachment_ids,  # Changed from attachment_ids to attachments
+                attachments=attachment_ids,
             )
             _logger.info('LINE webhook: Message posted successfully, id=%s', posted_message.id)
 
