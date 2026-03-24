@@ -25,6 +25,7 @@
         'security/ir.model.access.csv',
         'wizard/line_guest_link_partner_wizard_views.xml',
         'views/im_livechat_channel_views.xml',
+        'views/res_partner_views.xml',
     ],
     'assets': {},
     'installable': True,
