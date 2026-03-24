@@ -21,10 +21,19 @@ class LineGuestLinkPartnerWizard(models.TransientModel):
     )
 
     def action_link(self):
-        """Link the guest to the selected partner."""
+        """Link the guest to the selected partner.
+
+        Also syncs the LINE User ID to the partner for future use
+        (e.g. sending LINE messages from Odoo contact).
+        """
         self.ensure_one()
         self.guest_id.write({
             'line_partner_id': self.partner_id.id,
             'name': self.partner_id.name,
         })
+        # Sync LINE User ID to the partner
+        if self.guest_id.line_user_id and not self.partner_id.line_user_id:
+            self.partner_id.write({
+                'line_user_id': self.guest_id.line_user_id,
+            })
         return {'type': 'ir.actions.act_window_close'}

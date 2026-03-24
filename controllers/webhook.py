@@ -156,6 +156,9 @@ class LineWebhookController(http.Controller):
     def _get_or_create_guest(self, line_user_id, livechat_channel):
         """Get or create a mail.guest record for LINE user.
 
+        Fetches the LINE profile only when needed (new guest or generic name).
+        Also auto-creates or links a res.partner record.
+
         Args:
             line_user_id: LINE User ID.
             livechat_channel: im_livechat.channel record.
@@ -164,15 +167,93 @@ class LineWebhookController(http.Controller):
             mail.guest record.
         """
         Guest = request.env['mail.guest'].sudo()
+        Partner = request.env['res.partner'].sudo()
 
         guest = Guest.search([('line_user_id', '=', line_user_id)], limit=1)
+
         if not guest:
+            # New user - fetch LINE profile for display name
+            display_name = self._fetch_line_display_name(line_user_id, livechat_channel)
+            guest_name = display_name or 'LINE User'
+            # Find or create partner
+            partner = self._get_or_create_line_partner(
+                line_user_id, guest_name, Partner
+            )
             guest = Guest.create({
-                'name': f'LINE User',
+                'name': guest_name,
                 'line_user_id': line_user_id,
+                'line_partner_id': partner.id,
             })
+            _logger.info('LINE webhook: Created guest %s (name=%s) with partner %s',
+                        guest.id, guest_name, partner.id)
+        else:
+            # Existing guest - only fetch profile if name is generic or partner missing
+            needs_profile = (
+                guest.name in ('LINE User', '')
+                or not guest.line_partner_id
+            )
+            if needs_profile:
+                display_name = self._fetch_line_display_name(line_user_id, livechat_channel)
+                if display_name and guest.name in ('LINE User', ''):
+                    guest.write({'name': display_name})
+
+                if not guest.line_partner_id:
+                    guest_name = display_name or guest.name
+                    partner = self._get_or_create_line_partner(
+                        line_user_id, guest_name, Partner
+                    )
+                    guest.write({'line_partner_id': partner.id})
+                    _logger.info('LINE webhook: Linked existing guest %s to partner %s',
+                                guest.id, partner.id)
 
         return guest
+
+    def _fetch_line_display_name(self, line_user_id, livechat_channel):
+        """Fetch LINE user display name from profile API.
+
+        Args:
+            line_user_id: LINE User ID.
+            livechat_channel: im_livechat.channel record.
+
+        Returns:
+            str: Display name or empty string on failure.
+        """
+        access_token = livechat_channel._line_get_access_token(
+            livechat_channel.line_channel_id,
+            livechat_channel.line_channel_secret,
+        )
+        if not access_token:
+            _logger.warning('LINE webhook: Cannot fetch profile - no access token')
+            return ''
+
+        profile = livechat_channel._line_get_profile(access_token, line_user_id)
+        if profile:
+            display_name = profile.get('displayName', '')
+            _logger.info('LINE webhook: Fetched profile for %s: displayName=%s',
+                        line_user_id, display_name)
+            return display_name
+        return ''
+
+    def _get_or_create_line_partner(self, line_user_id, name, Partner):
+        """Find or create a res.partner for a LINE user.
+
+        Args:
+            line_user_id: LINE User ID.
+            name: Display name for the partner.
+            Partner: res.partner model (sudo).
+
+        Returns:
+            res.partner record.
+        """
+        partner = Partner.search([('line_user_id', '=', line_user_id)], limit=1)
+        if not partner:
+            partner = Partner.create({
+                'name': name,
+                'line_user_id': line_user_id,
+            })
+            _logger.info('LINE webhook: Created partner %s (name=%s) for LINE user %s',
+                        partner.id, name, line_user_id)
+        return partner
 
     def _get_or_create_discuss_channel(self, line_user_id, guest, livechat_channel):
         """Get or create a discuss.channel for LINE conversation.
@@ -229,9 +310,10 @@ class LineWebhookController(http.Controller):
                 mail_create_nosubscribe=False
             ).create(channel_vals)
 
-            # Add LINE user ID
+            # Add LINE user ID and profile info
             discuss_channel.write({
                 'line_user_id': line_user_id,
+                'line_display_name': guest.name,
             })
 
             # Add guest to channel members
@@ -243,6 +325,13 @@ class LineWebhookController(http.Controller):
 
             _logger.info('LINE webhook: Created new discuss channel %s for LINE user %s',
                         discuss_channel.id, line_user_id)
+        else:
+            # Update display name if it changed (e.g. guest name was updated from profile)
+            if guest.name and discuss_channel.line_display_name != guest.name:
+                discuss_channel.write({
+                    'line_display_name': guest.name,
+                    'anonymous_name': guest.name,
+                })
 
         return discuss_channel
 

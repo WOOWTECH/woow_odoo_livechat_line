@@ -18,6 +18,11 @@ class MailGuest(models.Model):
         help='Contact linked to this LINE user.',
     )
 
+    _sql_constraints = [
+        ('line_user_id_unique', 'unique(line_user_id)',
+         'A guest with this LINE User ID already exists.'),
+    ]
+
     def action_link_to_partner(self):
         """Open wizard to link guest to a partner."""
         self.ensure_one()
