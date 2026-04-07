@@ -1,0 +1,274 @@
+<section style="max-width: 896px; margin: 0 auto; font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color: #333; line-height: 1.6;">
+
+    <!-- ============================================================ -->
+    <!-- Banner                                                        -->
+    <!-- ============================================================ -->
+    <div style="background: linear-gradient(135deg, #06C755 0%, #04a648 100%); border-radius: 8px; padding: 40px 32px; text-align: center; margin-bottom: 32px;">
+        <h1 style="color: #fff; font-size: 32px; font-weight: 700; margin: 0 0 8px 0; letter-spacing: -0.5px;">
+            LiveChat LINE Integration
+        </h1>
+        <p style="color: rgba(255,255,255,0.92); font-size: 16px; margin: 0 0 16px 0;">
+            Seamlessly connect LINE Messaging API with Odoo LiveChat
+        </p>
+        <div style="display: inline-block; background: rgba(255,255,255,0.2); border-radius: 20px; padding: 4px 16px;">
+            <span style="color: #fff; font-size: 13px; font-weight: 600;">v18.0.1.0.0</span>
+            <span style="color: rgba(255,255,255,0.6); margin: 0 8px;">|</span>
+            <span style="color: #fff; font-size: 13px;">by WoowTech</span>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Overview                                                      -->
+    <!-- ============================================================ -->
+    <div style="background: #f8f9fa; border-left: 4px solid #06C755; border-radius: 4px; padding: 20px 24px; margin-bottom: 32px;">
+        <p style="margin: 0; font-size: 15px; color: #444;">
+            Enable your customer service team to handle <strong>LINE</strong> conversations
+            directly inside the standard Odoo <strong>Discuss</strong> interface.
+            Incoming LINE messages automatically create LiveChat sessions, and agent
+            replies are delivered back to the customer on LINE &mdash; all in real time.
+        </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Features                                                      -->
+    <!-- ============================================================ -->
+    <h2 style="font-size: 22px; font-weight: 700; color: #222; border-bottom: 2px solid #06C755; padding-bottom: 8px; margin-bottom: 20px;">
+        Key Features
+    </h2>
+
+    <table style="width: 100%; border-collapse: separate; border-spacing: 0 12px; margin-bottom: 32px;">
+        <tr>
+            <td style="width: 48%; vertical-align: top; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; padding: 16px 20px;">
+                <div style="font-size: 20px; margin-bottom: 6px;">&#9881;</div>
+                <h3 style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #222;">LINE Channel Configuration</h3>
+                <p style="margin: 0; font-size: 13px; color: #666;">
+                    Configure Channel ID, Channel Secret, and Channel Access Token
+                    directly from the LiveChat channel form. Per-channel settings
+                    enable multi-tenant deployments.
+                </p>
+            </td>
+            <td style="width: 4%;"></td>
+            <td style="width: 48%; vertical-align: top; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; padding: 16px 20px;">
+                <div style="font-size: 20px; margin-bottom: 6px;">&#128274;</div>
+                <h3 style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #222;">Webhook with HMAC-SHA256 Verification</h3>
+                <p style="margin: 0; font-size: 13px; color: #666;">
+                    Every incoming webhook request is validated using HMAC-SHA256
+                    signature verification against your Channel Secret, ensuring
+                    only authentic LINE platform events are processed.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="width: 48%; vertical-align: top; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; padding: 16px 20px;">
+                <div style="font-size: 20px; margin-bottom: 6px;">&#128101;</div>
+                <h3 style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #222;">Automatic Guest &amp; Partner Creation</h3>
+                <p style="margin: 0; font-size: 13px; color: #666;">
+                    First-time LINE users are automatically registered as
+                    <em>mail.guest</em> records. The LINE Profile API populates
+                    display name and avatar. Guests can later be promoted to
+                    full <em>res.partner</em> contacts.
+                </p>
+            </td>
+            <td style="width: 4%;"></td>
+            <td style="width: 48%; vertical-align: top; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; padding: 16px 20px;">
+                <div style="font-size: 20px; margin-bottom: 6px;">&#128100;</div>
+                <h3 style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #222;">LINE Profile API Integration</h3>
+                <p style="margin: 0; font-size: 13px; color: #666;">
+                    Fetches the user's LINE display name and profile picture
+                    automatically when a new conversation is created, giving
+                    agents immediate context about the customer.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="width: 48%; vertical-align: top; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; padding: 16px 20px;">
+                <div style="font-size: 20px; margin-bottom: 6px;">&#128172;</div>
+                <h3 style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #222;">Rich Message Support</h3>
+                <p style="margin: 0; font-size: 13px; color: #666;">
+                    Handles <strong>text</strong>, <strong>image</strong>,
+                    <strong>video</strong>, <strong>audio</strong>,
+                    <strong>file</strong>, <strong>sticker</strong>, and
+                    <strong>location</strong> messages from LINE, converting
+                    each type into the appropriate Odoo attachment or message body.
+                </p>
+            </td>
+            <td style="width: 4%;"></td>
+            <td style="width: 48%; vertical-align: top; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; padding: 16px 20px;">
+                <div style="font-size: 20px; margin-bottom: 6px;">&#8644;</div>
+                <h3 style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #222;">Bidirectional Messaging</h3>
+                <p style="margin: 0; font-size: 13px; color: #666;">
+                    Messages flow both ways: LINE&rarr;Odoo via webhook, and
+                    Odoo&rarr;LINE via the Push Message API. Agents reply from
+                    Discuss and customers receive responses instantly on LINE.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="width: 48%; vertical-align: top; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; padding: 16px 20px;">
+                <div style="font-size: 20px; margin-bottom: 6px;">&#128279;</div>
+                <h3 style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #222;">Guest-to-Partner Linking Wizard</h3>
+                <p style="margin: 0; font-size: 13px; color: #666;">
+                    A dedicated wizard lets agents link an anonymous LINE guest
+                    to an existing or new <em>res.partner</em> record, preserving
+                    the full conversation history under the contact.
+                </p>
+            </td>
+            <td style="width: 4%;"></td>
+            <td style="width: 48%; vertical-align: top; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; padding: 16px 20px;">
+                <div style="font-size: 20px; margin-bottom: 6px;">&#127959;</div>
+                <h3 style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #222;">Multi-tenant Support</h3>
+                <p style="margin: 0; font-size: 13px; color: #666;">
+                    Each LiveChat channel can be connected to a different LINE
+                    Official Account. Webhook routing automatically dispatches
+                    events to the correct channel based on the destination user ID.
+                </p>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ============================================================ -->
+    <!-- Architecture Diagram                                          -->
+    <!-- ============================================================ -->
+    <h2 style="font-size: 22px; font-weight: 700; color: #222; border-bottom: 2px solid #06C755; padding-bottom: 8px; margin-bottom: 20px;">
+        Architecture Overview
+    </h2>
+
+    <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 28px 24px; margin-bottom: 32px; overflow-x: auto;">
+        <pre style="font-family: 'Courier New', Consolas, monospace; font-size: 13px; line-height: 1.7; color: #333; margin: 0; white-space: pre; text-align: center;">
+&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;         &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;         &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;                 &#9474;         &#9474;                              &#9474;         &#9474;                 &#9474;
+&#9474;   LINE App      &#9474;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9658;&#9474;   Webhook Controller         &#9474;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9658;&#9474;   Discuss UI     &#9474;
+&#9474;   (Customer)    &#9474;  POST   &#9474;   /line/webhook/&lt;channel&gt;    &#9474;  notify  &#9474;   (Agent)       &#9474;
+&#9474;                 &#9474;&#9668;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9474;                              &#9474;&#9668;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9474;                 &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  reply  &#9474;   HMAC-SHA256 verification  &#9474;  reply  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                             &#9474;                              &#9474;
+                             &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                                          &#9474;
+                          &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9524;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+                          &#9474;                              &#9474;
+                          &#9474;   LINE API Service           &#9474;
+                          &#9474;   (Profile &amp; Push Message)   &#9474;
+                          &#9474;                              &#9474;
+                          &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+        </pre>
+    </div>
+
+    <!-- Module structure -->
+    <div style="background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 24px; margin-bottom: 32px;">
+        <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #222;">Module Structure</h3>
+        <pre style="font-family: 'Courier New', Consolas, monospace; font-size: 13px; line-height: 1.6; color: #555; margin: 0; white-space: pre;">
+woow_odoo_livechat_line/
+&#9500;&#9472;&#9472; controllers/
+&#9474;   &#9492;&#9472;&#9472; webhook.py              # LINE webhook endpoint &amp; signature check
+&#9500;&#9472;&#9472; models/
+&#9474;   &#9500;&#9472;&#9472; im_livechat_channel.py  # LINE config fields on LiveChat channel
+&#9474;   &#9500;&#9472;&#9472; discuss_channel.py      # Channel creation &amp; message routing
+&#9474;   &#9500;&#9472;&#9472; mail_guest.py           # Guest record with LINE user ID
+&#9474;   &#9500;&#9472;&#9472; mail_message.py         # Outbound message hook (Odoo &#8594; LINE)
+&#9474;   &#9500;&#9472;&#9472; res_partner.py          # Partner with LINE user ID field
+&#9474;   &#9492;&#9472;&#9472; line_api.py             # LINE Messaging API client
+&#9500;&#9472;&#9472; wizard/
+&#9474;   &#9492;&#9472;&#9472; line_guest_link_partner_wizard.py
+&#9500;&#9472;&#9472; views/
+&#9474;   &#9500;&#9472;&#9472; im_livechat_channel_views.xml
+&#9474;   &#9492;&#9472;&#9472; res_partner_views.xml
+&#9500;&#9472;&#9472; tests/                      # 128 tests across 8 test phases
+&#9492;&#9472;&#9472; static/
+    &#9492;&#9472;&#9472; description/
+        &#9500;&#9472;&#9472; icon.png
+        &#9492;&#9472;&#9472; index.html
+        </pre>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Screenshots                                                   -->
+    <!-- ============================================================ -->
+    <h2 style="font-size: 22px; font-weight: 700; color: #222; border-bottom: 2px solid #06C755; padding-bottom: 8px; margin-bottom: 20px;">
+        Screenshots
+    </h2>
+
+    <div style="margin-bottom: 24px;">
+        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; margin-bottom: 16px;">
+            <div style="background: #f8f9fa; padding: 10px 16px; border-bottom: 1px solid #e0e0e0;">
+                <strong style="font-size: 14px; color: #333;">Module Icon</strong>
+            </div>
+            <div style="padding: 20px; text-align: center;">
+                <img src="icon.png" alt="LiveChat LINE Integration module icon" style="max-width: 128px; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"/>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Requirements / Compatibility                                  -->
+    <!-- ============================================================ -->
+    <h2 style="font-size: 22px; font-weight: 700; color: #222; border-bottom: 2px solid #06C755; padding-bottom: 8px; margin-bottom: 20px;">
+        Requirements
+    </h2>
+
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 32px; font-size: 14px;">
+        <tr style="border-bottom: 1px solid #e9ecef;">
+            <td style="padding: 10px 12px; font-weight: 600; color: #444; width: 200px;">Odoo Version</td>
+            <td style="padding: 10px 12px; color: #555;">18.0</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e9ecef; background: #fafbfc;">
+            <td style="padding: 10px 12px; font-weight: 600; color: #444;">Dependencies</td>
+            <td style="padding: 10px 12px; color: #555;">im_livechat, mail</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e9ecef;">
+            <td style="padding: 10px 12px; font-weight: 600; color: #444;">License</td>
+            <td style="padding: 10px 12px; color: #555;">LGPL-3</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e9ecef; background: #fafbfc;">
+            <td style="padding: 10px 12px; font-weight: 600; color: #444;">LINE Account</td>
+            <td style="padding: 10px 12px; color: #555;">LINE Official Account with Messaging API enabled</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e9ecef;">
+            <td style="padding: 10px 12px; font-weight: 600; color: #444;">Network</td>
+            <td style="padding: 10px 12px; color: #555;">HTTPS endpoint reachable by LINE platform (webhook URL)</td>
+        </tr>
+    </table>
+
+    <!-- ============================================================ -->
+    <!-- Setup Steps                                                   -->
+    <!-- ============================================================ -->
+    <h2 style="font-size: 22px; font-weight: 700; color: #222; border-bottom: 2px solid #06C755; padding-bottom: 8px; margin-bottom: 20px;">
+        Quick Setup
+    </h2>
+
+    <ol style="padding-left: 20px; margin-bottom: 32px; font-size: 14px; color: #444;">
+        <li style="margin-bottom: 12px; padding-left: 4px;">
+            <strong>Create a LINE Official Account</strong> and enable the Messaging API
+            in the <a href="https://developers.line.biz/console/" style="color: #06C755; text-decoration: none;">LINE Developers Console</a>.
+        </li>
+        <li style="margin-bottom: 12px; padding-left: 4px;">
+            <strong>Install this module</strong> in your Odoo 18 instance.
+        </li>
+        <li style="margin-bottom: 12px; padding-left: 4px;">
+            <strong>Open a LiveChat channel</strong> and fill in the LINE tab:
+            Channel ID, Channel Secret, and Channel Access Token.
+        </li>
+        <li style="margin-bottom: 12px; padding-left: 4px;">
+            <strong>Set the Webhook URL</strong> in the LINE Developers Console to:<br/>
+            <code style="background: #f0f0f0; padding: 2px 8px; border-radius: 3px; font-size: 13px;">
+                https://your-odoo.com/line/webhook/&lt;livechat_channel_id&gt;
+            </code>
+        </li>
+        <li style="margin-bottom: 12px; padding-left: 4px;">
+            <strong>Send a test message</strong> from LINE &mdash; it should appear in Discuss.
+        </li>
+    </ol>
+
+    <!-- ============================================================ -->
+    <!-- Footer                                                        -->
+    <!-- ============================================================ -->
+    <div style="border-top: 2px solid #e9ecef; padding-top: 20px; margin-top: 40px; text-align: center;">
+        <p style="font-size: 14px; color: #888; margin: 0 0 4px 0;">
+            Developed and maintained by
+            <a href="https://woowtech.com" style="color: #06C755; text-decoration: none; font-weight: 600;">WoowTech</a>
+        </p>
+        <p style="font-size: 12px; color: #aaa; margin: 0;">
+            LINE is a trademark of LY Corporation.
+        </p>
+    </div>
+
+</section>
