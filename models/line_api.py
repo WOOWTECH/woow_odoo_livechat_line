@@ -2,7 +2,6 @@
 
 import json
 import logging
-import threading
 import time
 import requests
 
@@ -15,7 +14,6 @@ LINE_DATA_API_BASE_URL = 'https://api-data.line.me/v2'
 
 # Token cache: {channel_id: {'token': str, 'expires_at': float}}
 _token_cache = {}
-_token_cache_lock = threading.Lock()
 # Token validity buffer (refresh 5 minutes before expiry)
 TOKEN_EXPIRY_BUFFER = 300
 
@@ -40,13 +38,12 @@ class LineApiMixin(models.AbstractModel):
         """
         global _token_cache
 
-        # Check cache first (with lock for thread safety)
-        with _token_cache_lock:
-            cached = _token_cache.get(channel_id)
-            if cached and cached['expires_at'] > time.time():
-                return cached['token']
+        # Check cache first
+        cached = _token_cache.get(channel_id)
+        if cached and cached['expires_at'] > time.time():
+            return cached['token']
 
-        # Request new token (outside lock to avoid blocking other threads)
+        # Request new token
         url = 'https://api.line.me/v2/oauth/accessToken'
         data = {
             'grant_type': 'client_credentials',
@@ -62,12 +59,11 @@ class LineApiMixin(models.AbstractModel):
             # LINE tokens are valid for 30 days (2592000 seconds)
             expires_in = result.get('expires_in', 2592000)
 
-            # Cache the token (with lock for thread safety)
-            with _token_cache_lock:
-                _token_cache[channel_id] = {
-                    'token': access_token,
-                    'expires_at': time.time() + expires_in - TOKEN_EXPIRY_BUFFER,
-                }
+            # Cache the token
+            _token_cache[channel_id] = {
+                'token': access_token,
+                'expires_at': time.time() + expires_in - TOKEN_EXPIRY_BUFFER,
+            }
             _logger.info('LINE API: Access token refreshed for channel %s', channel_id)
             return access_token
         except requests.exceptions.RequestException as e:
@@ -98,11 +94,30 @@ class LineApiMixin(models.AbstractModel):
         _logger.info('LINE API: Pushing %s messages to user %s', len(messages), line_user_id)
         _logger.info('LINE API: Message types: %s', [m.get('type') for m in messages])
 
+        # Debug: write full request to file
+        try:
+            import datetime
+            with open('/tmp/line_push_debug.log', 'a') as f:
+                f.write(f'\n=== {datetime.datetime.now()} ===\n')
+                f.write(f'URL: {url}\n')
+                f.write(f'User: {line_user_id}\n')
+                f.write(f'Messages:\n{json.dumps(messages, indent=2, ensure_ascii=False)}\n')
+        except Exception as debug_err:
+            _logger.warning('LINE API: Debug log write failed: %s', debug_err)
+
         try:
             response = requests.post(
                 url, headers=headers, json=data, timeout=30
             )
             _logger.info('LINE API: Push response status=%s', response.status_code)
+
+            # Debug: write response
+            try:
+                with open('/tmp/line_push_debug.log', 'a') as f:
+                    f.write(f'Response status: {response.status_code}\n')
+                    f.write(f'Response body: {response.text[:1000] if response.text else "empty"}\n')
+            except Exception:
+                pass
 
             if response.status_code != 200:
                 _logger.error('LINE API: Push failed, response=%s', response.text[:500] if response.text else '')

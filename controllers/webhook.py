@@ -13,6 +13,15 @@ from odoo.http import request
 
 _logger = logging.getLogger(__name__)
 
+# Also write to a file for easier debugging
+def _log_to_file(msg):
+    """Write log to file for debugging."""
+    try:
+        with open('/tmp/line_webhook_debug.log', 'a') as f:
+            import datetime
+            f.write(f"{datetime.datetime.now()}: {msg}\n")
+    except Exception:
+        pass
 
 
 class LineWebhookController(http.Controller):
@@ -35,7 +44,7 @@ class LineWebhookController(http.Controller):
             dict: Empty dict on success (LINE expects 200 OK).
         """
         _logger.info('LINE webhook: Received request for channel_id=%s', channel_id)
-
+        _log_to_file(f'Received request for channel_id={channel_id}')
         _logger.info('LINE webhook: Headers=%s', dict(request.httprequest.headers))
 
         livechat_channel = request.env['im_livechat.channel'].sudo().browse(channel_id)
@@ -342,7 +351,7 @@ class LineWebhookController(http.Controller):
 
         _logger.info('LINE webhook: _create_message called, message_type=%s, message_id=%s, message=%s',
                     message_type, message_id, json.dumps(message)[:300])
-        _logger.debug('LINE webhook: _create_message type=%s, id=%s', message_type, message_id)
+        _log_to_file(f'_create_message: type={message_type}, id={message_id}, msg={json.dumps(message)[:300]}')
 
         if message_type == 'text':
             body = message.get('text', '')
@@ -378,7 +387,7 @@ class LineWebhookController(http.Controller):
             body = f'📍 {title}<br/>{address}<br/><a href="{maps_url}">View on Google Maps</a>'
 
         else:
-            body = f'[Unsupported message type: {escape(str(message_type))}]'
+            body = f'[Unsupported message type: {message_type}]'
 
         if body or attachment_ids:
             _logger.info('LINE webhook: Posting message to channel %s, body=%s, has_attachments=%s',
@@ -410,7 +419,7 @@ class LineWebhookController(http.Controller):
         """
         _logger.info('LINE webhook: Starting content download for message_id=%s, type=%s',
                     message_id, message_type)
-        _logger.debug('LINE webhook: download content message_id=%s, type=%s', message_id, message_type)
+        _log_to_file(f'_download_line_content: message_id={message_id}, type={message_type}')
 
         # Get access token
         access_token = livechat_channel._line_get_access_token(
@@ -477,7 +486,7 @@ class LineWebhookController(http.Controller):
 
         _logger.info('LINE webhook: Prepared content filename=%s, mimetype=%s, size=%s',
                     filename, mimetype, len(content))
-        _logger.debug('LINE webhook: download success filename=%s, size=%s', filename, len(content))
+        _log_to_file(f'_download_line_content: success filename={filename}, size={len(content)}')
 
         # Return (filename, content) tuple for message_post attachments parameter
         return (filename, content, mimetype)
