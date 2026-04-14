@@ -1,0 +1,223 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* woow_odoo_livechat_line
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 18.0-20260119\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-14 01:01+0000\n"
+"PO-Revision-Date: 2026-04-14 01:01+0000\n"
+"Last-Translator: WoowTech\n"
+"Language-Team: Chinese (Taiwan)\n"
+"Language: zh_TW\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.constraint,message:woow_odoo_livechat_line.constraint_res_partner_line_user_id_unique
+msgid "A contact with this LINE User ID already exists."
+msgstr "此 LINE 用戶 ID 已綁定至其他聯絡人。"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.constraint,message:woow_odoo_livechat_line.constraint_mail_guest_line_user_id_unique
+msgid "A guest with this LINE User ID already exists."
+msgstr "此 LINE 用戶 ID 已存在對應的訪客紀錄。"
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.line_guest_link_partner_wizard_form
+msgid "Cancel"
+msgstr "取消"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_im_livechat_channel__line_channel_id
+msgid "Channel ID from LINE Developers Console."
+msgstr "LINE 開發者控制台中的 Channel ID。"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_im_livechat_channel__line_channel_secret
+msgid "Channel Secret from LINE Developers Console."
+msgstr "LINE 開發者控制台中的 Channel Secret。"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_im_livechat_channel__line_webhook_url
+msgid "Configure this URL in LINE Developers Console."
+msgstr "請將此網址設定至 LINE 開發者控制台的 Webhook URL。"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_res_partner
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__partner_id
+msgid "Contact"
+msgstr "聯絡人"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_mail_guest__line_partner_id
+msgid "Contact linked to this LINE user."
+msgstr "與此 LINE 用戶綁定的聯絡人。"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__create_uid
+msgid "Created by"
+msgstr "建立者"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__create_date
+msgid "Created on"
+msgstr "建立於"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_discuss_channel
+msgid "Discussion Channel"
+msgstr "討論頻道"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__display_name
+msgid "Display Name"
+msgstr "顯示名稱"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_discuss_channel__line_display_name
+msgid "Display name from LINE profile."
+msgstr "LINE 個人資料中的顯示名稱。"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_im_livechat_channel__line_enabled
+msgid "Enable LINE Integration"
+msgstr "啟用 LINE 整合"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_im_livechat_channel__line_enabled
+msgid "Enable LINE Messaging API integration for this channel."
+msgstr "為此頻道啟用 LINE Messaging API 整合。"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_mail_guest
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__guest_id
+msgid "Guest"
+msgstr "訪客"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__id
+msgid "ID"
+msgstr "ID"
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.im_livechat_channel_view_form_line
+msgid "LINE"
+msgstr "LINE"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_line_api_mixin
+msgid "LINE API Mixin"
+msgstr "LINE API 混入"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_im_livechat_channel__line_channel_id
+msgid "LINE Channel ID"
+msgstr "LINE 頻道 ID"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_im_livechat_channel__line_channel_secret
+msgid "LINE Channel Secret"
+msgstr "LINE 頻道密鑰"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_discuss_channel__line_display_name
+msgid "LINE Display Name"
+msgstr "LINE 顯示名稱"
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.res_partner_view_form_line
+msgid "LINE ID"
+msgstr "LINE ID"
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.im_livechat_channel_view_form_line
+msgid "LINE Messaging API Settings"
+msgstr "LINE Messaging API 設定"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_discuss_channel__line_picture_url
+msgid "LINE Picture URL"
+msgstr "LINE 大頭貼網址"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_discuss_channel__line_user_id
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_mail_guest__line_user_id
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_res_partner__line_user_id
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_res_users__line_user_id
+msgid "LINE User ID"
+msgstr "LINE 用戶 ID"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_discuss_channel__line_user_id
+msgid "LINE User ID associated with this conversation."
+msgstr "與此對話關聯的 LINE 用戶 ID。"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_mail_guest__line_user_id
+msgid "LINE User ID for this guest."
+msgstr "此訪客的 LINE 用戶 ID。"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__write_uid
+msgid "Last Updated by"
+msgstr "最後更新者"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__write_date
+msgid "Last Updated on"
+msgstr "最後更新於"
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.line_guest_link_partner_wizard_form
+msgid "Link"
+msgstr "綁定"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_line_guest_link_partner_wizard
+msgid "Link LINE Guest to Partner"
+msgstr "綁定 LINE 訪客至聯絡人"
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.line_guest_link_partner_wizard_form
+msgid "Link to Contact"
+msgstr "綁定至聯絡人"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_mail_guest__line_partner_id
+msgid "Linked Contact"
+msgstr "已綁定聯絡人"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_im_livechat_channel
+msgid "Livechat Channel"
+msgstr "即時通訊頻道"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_mail_message
+msgid "Message"
+msgstr "訊息"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_discuss_channel__line_picture_url
+msgid "Profile picture URL from LINE."
+msgstr "LINE 個人資料的大頭貼網址。"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_res_partner__line_user_id
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_res_users__line_user_id
+msgid "Unique LINE User ID linked to this contact."
+msgstr "與此聯絡人綁定的唯一 LINE 用戶 ID。"
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.im_livechat_channel_view_form_line
+msgid "Webhook Configuration"
+msgstr "Webhook 設定"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_im_livechat_channel__line_webhook_url
+msgid "Webhook URL"
+msgstr "Webhook 網址"

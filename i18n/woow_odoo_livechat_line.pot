@@ -1,0 +1,222 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* woow_odoo_livechat_line
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 18.0-20260119\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-14 01:01+0000\n"
+"PO-Revision-Date: 2026-04-14 01:01+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.constraint,message:woow_odoo_livechat_line.constraint_res_partner_line_user_id_unique
+msgid "A contact with this LINE User ID already exists."
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.constraint,message:woow_odoo_livechat_line.constraint_mail_guest_line_user_id_unique
+msgid "A guest with this LINE User ID already exists."
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.line_guest_link_partner_wizard_form
+msgid "Cancel"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_im_livechat_channel__line_channel_id
+msgid "Channel ID from LINE Developers Console."
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_im_livechat_channel__line_channel_secret
+msgid "Channel Secret from LINE Developers Console."
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_im_livechat_channel__line_webhook_url
+msgid "Configure this URL in LINE Developers Console."
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_res_partner
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__partner_id
+msgid "Contact"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_mail_guest__line_partner_id
+msgid "Contact linked to this LINE user."
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__create_uid
+msgid "Created by"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__create_date
+msgid "Created on"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_discuss_channel
+msgid "Discussion Channel"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__display_name
+msgid "Display Name"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_discuss_channel__line_display_name
+msgid "Display name from LINE profile."
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_im_livechat_channel__line_enabled
+msgid "Enable LINE Integration"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_im_livechat_channel__line_enabled
+msgid "Enable LINE Messaging API integration for this channel."
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_mail_guest
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__guest_id
+msgid "Guest"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__id
+msgid "ID"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.im_livechat_channel_view_form_line
+msgid "LINE"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_line_api_mixin
+msgid "LINE API Mixin"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_im_livechat_channel__line_channel_id
+msgid "LINE Channel ID"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_im_livechat_channel__line_channel_secret
+msgid "LINE Channel Secret"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_discuss_channel__line_display_name
+msgid "LINE Display Name"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.res_partner_view_form_line
+msgid "LINE ID"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.im_livechat_channel_view_form_line
+msgid "LINE Messaging API Settings"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_discuss_channel__line_picture_url
+msgid "LINE Picture URL"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_discuss_channel__line_user_id
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_mail_guest__line_user_id
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_res_partner__line_user_id
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_res_users__line_user_id
+msgid "LINE User ID"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_discuss_channel__line_user_id
+msgid "LINE User ID associated with this conversation."
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_mail_guest__line_user_id
+msgid "LINE User ID for this guest."
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__write_uid
+msgid "Last Updated by"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_line_guest_link_partner_wizard__write_date
+msgid "Last Updated on"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.line_guest_link_partner_wizard_form
+msgid "Link"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_line_guest_link_partner_wizard
+msgid "Link LINE Guest to Partner"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.line_guest_link_partner_wizard_form
+msgid "Link to Contact"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_mail_guest__line_partner_id
+msgid "Linked Contact"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_im_livechat_channel
+msgid "Livechat Channel"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model,name:woow_odoo_livechat_line.model_mail_message
+msgid "Message"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_discuss_channel__line_picture_url
+msgid "Profile picture URL from LINE."
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_res_partner__line_user_id
+#: model:ir.model.fields,help:woow_odoo_livechat_line.field_res_users__line_user_id
+msgid "Unique LINE User ID linked to this contact."
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model_terms:ir.ui.view,arch_db:woow_odoo_livechat_line.im_livechat_channel_view_form_line
+msgid "Webhook Configuration"
+msgstr ""
+
+#. module: woow_odoo_livechat_line
+#: model:ir.model.fields,field_description:woow_odoo_livechat_line.field_im_livechat_channel__line_webhook_url
+msgid "Webhook URL"
+msgstr ""
