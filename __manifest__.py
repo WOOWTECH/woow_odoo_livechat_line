@@ -1,6 +1,6 @@
 {
     'name': 'LiveChat LINE Integration',
-    'version': '18.0.1.0.0',
+    'version': '18.0.2.0.0',
     'category': 'Website/Live Chat',
     'summary': 'Integrate LINE Messaging API with Odoo LiveChat',
     'description': """
@@ -19,13 +19,12 @@
     'license': 'LGPL-3',
     'depends': [
         'im_livechat',
-        'mail',
+        'woow_line_base',
     ],
     'data': [
         'security/ir.model.access.csv',
         'wizard/line_guest_link_partner_wizard_views.xml',
         'views/im_livechat_channel_views.xml',
-        'views/res_partner_views.xml',
     ],
     'assets': {},
     'installable': True,

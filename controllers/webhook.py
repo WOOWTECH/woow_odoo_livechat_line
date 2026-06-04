@@ -1,8 +1,5 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import base64
-import hashlib
-import hmac
 import json
 import logging
 
@@ -52,19 +49,25 @@ class LineWebhookController(http.Controller):
             _logger.warning('LINE webhook: Invalid or disabled channel %s', channel_id)
             return {}
 
-        # Verify LINE signature
-        body = request.httprequest.get_data(as_text=True)
+        # Verify LINE signature using line.api.service
+        body = request.httprequest.get_data()
+        body_text = body.decode('utf-8') if isinstance(body, bytes) else body
         signature = request.httprequest.headers.get('X-Line-Signature', '')
 
-        _logger.info('LINE webhook: Body length=%s, signature=%s', len(body), signature[:20] if signature else 'None')
+        _logger.info('LINE webhook: Body length=%s, signature=%s',
+                     len(body_text), signature[:20] if signature else 'None')
 
-        if not self._verify_signature(body, signature, livechat_channel.line_channel_secret):
+        line_api = request.env['line.api.service'].sudo()
+        if not line_api.verify_webhook_signature(
+            body, signature,
+            channel_secret=livechat_channel.line_channel_secret,
+        ):
             _logger.warning('LINE webhook: Invalid signature for channel %s', channel_id)
-            _logger.warning('LINE webhook: Body=%s', body[:200] if body else 'None')
+            _logger.warning('LINE webhook: Body=%s', body_text[:200] if body_text else 'None')
             return {}
 
         # Process events
-        data = json.loads(body)
+        data = json.loads(body_text)
         events = data.get('events', [])
 
         _logger.info('LINE webhook: Processing %s events', len(events))
@@ -79,29 +82,6 @@ class LineWebhookController(http.Controller):
 
         return {}
 
-    def _verify_signature(self, body, signature, channel_secret):
-        """Verify LINE webhook signature using HMAC-SHA256.
-
-        Args:
-            body: Request body as string.
-            signature: X-Line-Signature header value.
-            channel_secret: LINE Channel Secret.
-
-        Returns:
-            bool: True if signature is valid.
-        """
-        if not channel_secret or not signature:
-            return False
-
-        hash_value = hmac.new(
-            channel_secret.encode('utf-8'),
-            body.encode('utf-8'),
-            hashlib.sha256,
-        ).digest()
-        expected_signature = base64.b64encode(hash_value).decode('utf-8')
-
-        return hmac.compare_digest(signature, expected_signature)
-
     def _process_event(self, event, livechat_channel):
         """Process a single LINE event.
 
@@ -114,11 +94,39 @@ class LineWebhookController(http.Controller):
         if event_type == 'message':
             self._handle_message_event(event, livechat_channel)
         elif event_type == 'follow':
-            _logger.info('LINE webhook: User followed channel')
+            self._handle_follow_event(event, livechat_channel)
         elif event_type == 'unfollow':
             _logger.info('LINE webhook: User unfollowed channel')
         else:
             _logger.debug('LINE webhook: Unhandled event type: %s', event_type)
+
+    def _handle_follow_event(self, event, livechat_channel):
+        """Handle LINE follow event - create line.user record.
+
+        Args:
+            event: LINE follow event dict.
+            livechat_channel: im_livechat.channel record.
+        """
+        source = event.get('source', {})
+        line_user_id = source.get('userId')
+        if not line_user_id:
+            return
+
+        _logger.info('LINE webhook: User %s followed channel', line_user_id)
+
+        # Fetch profile and create/update line.user record
+        line_api = request.env['line.api.service'].sudo()
+        access_token = line_api.get_access_token(
+            channel_id=livechat_channel.line_channel_id,
+            channel_secret=livechat_channel.line_channel_secret,
+        )
+        if access_token:
+            profile = line_api.get_profile(line_user_id, access_token=access_token)
+            if profile:
+                request.env['line.user'].sudo().create_or_update_from_webhook(
+                    line_user_id, profile,
+                )
+                _logger.info('LINE webhook: Created/updated line.user for follower %s', line_user_id)
 
     def _handle_message_event(self, event, livechat_channel):
         """Handle LINE message event.
@@ -157,7 +165,7 @@ class LineWebhookController(http.Controller):
         """Get or create a mail.guest record for LINE user.
 
         Fetches the LINE profile only when needed (new guest or generic name).
-        Also auto-creates or links a res.partner record.
+        Also creates/updates line.user record in woow_line_base.
 
         Args:
             line_user_id: LINE User ID.
@@ -167,25 +175,37 @@ class LineWebhookController(http.Controller):
             mail.guest record.
         """
         Guest = request.env['mail.guest'].sudo()
-        Partner = request.env['res.partner'].sudo()
+        LineUser = request.env['line.user'].sudo()
 
         guest = Guest.search([('line_user_id', '=', line_user_id)], limit=1)
 
         if not guest:
             # New user - fetch LINE profile for display name
-            display_name = self._fetch_line_display_name(line_user_id, livechat_channel)
+            profile = self._fetch_line_profile(line_user_id, livechat_channel)
+            display_name = profile.get('displayName', '') if profile else ''
             guest_name = display_name or 'LINE User'
-            # Find or create partner
-            partner = self._get_or_create_line_partner(
-                line_user_id, guest_name, Partner
-            )
-            guest = Guest.create({
+
+            # Create/update line.user record (handles partner creation via woow_line_base)
+            if profile:
+                line_user = LineUser.create_or_update_from_webhook(line_user_id, profile)
+            else:
+                line_user = LineUser.create_or_update_from_webhook(
+                    line_user_id, {'displayName': guest_name},
+                )
+
+            # Set line_partner_id from the line.user's partner if available
+            partner = line_user.partner_id if line_user and line_user.partner_id else False
+
+            guest_vals = {
                 'name': guest_name,
                 'line_user_id': line_user_id,
-                'line_partner_id': partner.id,
-            })
-            _logger.info('LINE webhook: Created guest %s (name=%s) with partner %s',
-                        guest.id, guest_name, partner.id)
+            }
+            if partner:
+                guest_vals['line_partner_id'] = partner.id
+
+            guest = Guest.create(guest_vals)
+            _logger.info('LINE webhook: Created guest %s (name=%s) for LINE user %s',
+                        guest.id, guest_name, line_user_id)
         else:
             # Existing guest - only fetch profile if name is generic or partner missing
             needs_profile = (
@@ -193,67 +213,51 @@ class LineWebhookController(http.Controller):
                 or not guest.line_partner_id
             )
             if needs_profile:
-                display_name = self._fetch_line_display_name(line_user_id, livechat_channel)
+                profile = self._fetch_line_profile(line_user_id, livechat_channel)
+                display_name = profile.get('displayName', '') if profile else ''
+
                 if display_name and guest.name in ('LINE User', ''):
                     guest.write({'name': display_name})
 
-                if not guest.line_partner_id:
-                    guest_name = display_name or guest.name
-                    partner = self._get_or_create_line_partner(
-                        line_user_id, guest_name, Partner
+                # Create/update line.user record
+                if profile:
+                    line_user = LineUser.create_or_update_from_webhook(line_user_id, profile)
+                else:
+                    line_user = LineUser.create_or_update_from_webhook(
+                        line_user_id, {'displayName': guest.name},
                     )
-                    guest.write({'line_partner_id': partner.id})
+
+                if not guest.line_partner_id and line_user and line_user.partner_id:
+                    guest.write({'line_partner_id': line_user.partner_id.id})
                     _logger.info('LINE webhook: Linked existing guest %s to partner %s',
-                                guest.id, partner.id)
+                                guest.id, line_user.partner_id.id)
 
         return guest
 
-    def _fetch_line_display_name(self, line_user_id, livechat_channel):
-        """Fetch LINE user display name from profile API.
+    def _fetch_line_profile(self, line_user_id, livechat_channel):
+        """Fetch LINE user profile from profile API.
 
         Args:
             line_user_id: LINE User ID.
             livechat_channel: im_livechat.channel record.
 
         Returns:
-            str: Display name or empty string on failure.
+            dict: User profile or empty dict on failure.
         """
-        access_token = livechat_channel._line_get_access_token(
-            livechat_channel.line_channel_id,
-            livechat_channel.line_channel_secret,
+        line_api = request.env['line.api.service'].sudo()
+        access_token = line_api.get_access_token(
+            channel_id=livechat_channel.line_channel_id,
+            channel_secret=livechat_channel.line_channel_secret,
         )
         if not access_token:
             _logger.warning('LINE webhook: Cannot fetch profile - no access token')
-            return ''
+            return {}
 
-        profile = livechat_channel._line_get_profile(access_token, line_user_id)
+        profile = line_api.get_profile(line_user_id, access_token=access_token)
         if profile:
-            display_name = profile.get('displayName', '')
             _logger.info('LINE webhook: Fetched profile for %s: displayName=%s',
-                        line_user_id, display_name)
-            return display_name
-        return ''
-
-    def _get_or_create_line_partner(self, line_user_id, name, Partner):
-        """Find or create a res.partner for a LINE user.
-
-        Args:
-            line_user_id: LINE User ID.
-            name: Display name for the partner.
-            Partner: res.partner model (sudo).
-
-        Returns:
-            res.partner record.
-        """
-        partner = Partner.search([('line_user_id', '=', line_user_id)], limit=1)
-        if not partner:
-            partner = Partner.create({
-                'name': name,
-                'line_user_id': line_user_id,
-            })
-            _logger.info('LINE webhook: Created partner %s (name=%s) for LINE user %s',
-                        partner.id, name, line_user_id)
-        return partner
+                        line_user_id, profile.get('displayName', ''))
+        return profile or {}
 
     def _get_or_create_discuss_channel(self, line_user_id, guest, livechat_channel):
         """Get or create a discuss.channel for LINE conversation.
@@ -421,10 +425,12 @@ class LineWebhookController(http.Controller):
                     message_id, message_type)
         _log_to_file(f'_download_line_content: message_id={message_id}, type={message_type}')
 
+        line_api = request.env['line.api.service'].sudo()
+
         # Get access token
-        access_token = livechat_channel._line_get_access_token(
-            livechat_channel.line_channel_id,
-            livechat_channel.line_channel_secret,
+        access_token = line_api.get_access_token(
+            channel_id=livechat_channel.line_channel_id,
+            channel_secret=livechat_channel.line_channel_secret,
         )
         if not access_token:
             _logger.error('LINE webhook: Failed to get access token for content download')
@@ -432,8 +438,8 @@ class LineWebhookController(http.Controller):
 
         _logger.info('LINE webhook: Got access token, downloading content...')
 
-        # Download content (returns tuple)
-        result = livechat_channel._line_get_content(access_token, message_id)
+        # Download content via line.api.service
+        result = line_api.get_content(message_id, access_token=access_token)
         if result is None or (isinstance(result, tuple) and result[0] is None):
             _logger.error('LINE webhook: Failed to download content %s', message_id)
             return None

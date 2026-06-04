@@ -6,8 +6,7 @@ from odoo.exceptions import ValidationError
 
 class ImLivechatChannel(models.Model):
     """Extend LiveChat channel to add LINE configuration."""
-    _inherit = ['im_livechat.channel', 'line.api.mixin']
-    _name = 'im_livechat.channel'
+    _inherit = 'im_livechat.channel'
 
     line_enabled = fields.Boolean(
         string='Enable LINE Integration',

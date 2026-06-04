@@ -10,8 +10,7 @@ _logger = logging.getLogger(__name__)
 
 class DiscussChannel(models.Model):
     """Extend Discuss channel to add LINE user association."""
-    _inherit = ['discuss.channel', 'line.api.mixin']
-    _name = 'discuss.channel'
+    _inherit = 'discuss.channel'
 
     line_user_id = fields.Char(
         string='LINE User ID',
@@ -41,10 +40,12 @@ class DiscussChannel(models.Model):
         if not livechat_channel.line_enabled:
             return
 
+        line_api = self.env['line.api.service']
+
         # Get access token
-        access_token = self._line_get_access_token(
-            livechat_channel.line_channel_id,
-            livechat_channel.line_channel_secret,
+        access_token = line_api.get_access_token(
+            channel_id=livechat_channel.line_channel_id,
+            channel_secret=livechat_channel.line_channel_secret,
         )
         if not access_token:
             _logger.error('LINE: Failed to get access token for channel %s', livechat_channel.id)
@@ -58,7 +59,7 @@ class DiscussChannel(models.Model):
         # Strip HTML tags for LINE
         text = re.sub(r'<[^>]+>', '', body).strip()
         if text:
-            messages.append(self._line_build_text_message(text))
+            messages.append(line_api.build_text_message(text))
 
         # Get base URL for attachments
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
@@ -83,12 +84,12 @@ class DiscussChannel(models.Model):
                 image_url = self._ensure_https_url(image_url)
                 if image_url:
                     _logger.info('LINE: Sending image URL=%s', image_url)
-                    messages.append(self._line_build_image_message(image_url))
+                    messages.append(line_api.build_image_message(image_url))
                 else:
                     _logger.warning('LINE: Cannot send image - URL must be HTTPS')
                     # Fallback: send as text link
-                    messages.append(self._line_build_text_message(
-                        f'🖼️ Image: {attachment.name}\n{base_url}/web/image/{attachment.id}'
+                    messages.append(line_api.build_text_message(
+                        f'Image: {attachment.name}\n{base_url}/web/image/{attachment.id}'
                     ))
 
             elif mimetype.startswith('video/'):
@@ -100,11 +101,11 @@ class DiscussChannel(models.Model):
                     preview_url = f'{base_url}/woow_odoo_livechat_line/static/img/video_preview.png'
                     preview_url = self._ensure_https_url(preview_url) or video_url
                     _logger.info('LINE: Sending video URL=%s, preview=%s', video_url, preview_url)
-                    messages.append(self._line_build_video_message(video_url, preview_url))
+                    messages.append(line_api.build_video_message(video_url, preview_url))
                 else:
                     _logger.warning('LINE: Cannot send video - URL must be HTTPS')
-                    messages.append(self._line_build_text_message(
-                        f'🎬 Video: {attachment.name}\n{base_url}/web/content/{attachment.id}'
+                    messages.append(line_api.build_text_message(
+                        f'Video: {attachment.name}\n{base_url}/web/content/{attachment.id}'
                     ))
 
             elif mimetype.startswith('audio/'):
@@ -114,11 +115,11 @@ class DiscussChannel(models.Model):
                 if audio_url:
                     duration_ms = 60000  # Default 60 seconds
                     _logger.info('LINE: Sending audio URL=%s', audio_url)
-                    messages.append(self._line_build_audio_message(audio_url, duration_ms))
+                    messages.append(line_api.build_audio_message(audio_url, duration_ms))
                 else:
                     _logger.warning('LINE: Cannot send audio - URL must be HTTPS')
-                    messages.append(self._line_build_text_message(
-                        f'🎵 Audio: {attachment.name}\n{base_url}/web/content/{attachment.id}'
+                    messages.append(line_api.build_text_message(
+                        f'Audio: {attachment.name}\n{base_url}/web/content/{attachment.id}'
                     ))
 
             else:
@@ -127,7 +128,7 @@ class DiscussChannel(models.Model):
                 file_url = self._ensure_https_url(file_url)
 
                 _logger.info('LINE: Sending file as Flex Message card, name=%s, url=%s', attachment.name, file_url)
-                messages.append(self._line_build_file_message(
+                messages.append(line_api.build_file_message(
                     attachment.name,
                     file_url,
                     attachment.file_size
@@ -138,7 +139,9 @@ class DiscussChannel(models.Model):
             # LINE allows max 5 messages per push request
             for i in range(0, len(messages), 5):
                 batch = messages[i:i + 5]
-                success = self._line_push_message(access_token, self.line_user_id, batch)
+                success = line_api.push_message(
+                    self.line_user_id, batch, access_token=access_token,
+                )
                 if success:
                     _logger.info('LINE: Sent %s messages to user %s', len(batch), self.line_user_id)
                 else:

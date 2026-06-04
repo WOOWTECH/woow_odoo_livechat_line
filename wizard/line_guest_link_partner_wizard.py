@@ -23,17 +23,36 @@ class LineGuestLinkPartnerWizard(models.TransientModel):
     def action_link(self):
         """Link the guest to the selected partner.
 
-        Also syncs the LINE User ID to the partner for future use
-        (e.g. sending LINE messages from Odoo contact).
+        Also creates/binds a line.user record in woow_line_base to maintain
+        the LINE identity linked to the partner.
         """
         self.ensure_one()
         self.guest_id.write({
             'line_partner_id': self.partner_id.id,
             'name': self.partner_id.name,
         })
-        # Sync LINE User ID to the partner
-        if self.guest_id.line_user_id and not self.partner_id.line_user_id:
-            self.partner_id.write({
-                'line_user_id': self.guest_id.line_user_id,
-            })
+        # Create or bind line.user record for this partner
+        if self.guest_id.line_user_id:
+            LineUser = self.env['line.user'].sudo()
+            line_user = LineUser.search(
+                [('line_uid', '=', self.guest_id.line_user_id)], limit=1,
+            )
+            if line_user:
+                # Update existing line.user to point to this partner
+                if line_user.partner_id != self.partner_id:
+                    line_user.write({'partner_id': self.partner_id.id})
+            else:
+                # Create new line.user record bound to the partner
+                LineUser.create_or_update_from_webhook(
+                    self.guest_id.line_user_id,
+                    {'displayName': self.partner_id.name},
+                )
+                # Re-search to bind partner (create_or_update_from_webhook may
+                # not set partner_id automatically)
+                line_user = LineUser.search(
+                    [('line_uid', '=', self.guest_id.line_user_id)], limit=1,
+                )
+                if line_user and line_user.partner_id != self.partner_id:
+                    line_user.write({'partner_id': self.partner_id.id})
+
         return {'type': 'ir.actions.act_window_close'}
