@@ -10,15 +10,9 @@ from odoo.http import request
 
 _logger = logging.getLogger(__name__)
 
-# Also write to a file for easier debugging
 def _log_to_file(msg):
-    """Write log to file for debugging."""
-    try:
-        with open('/tmp/line_webhook_debug.log', 'a') as f:
-            import datetime
-            f.write(f"{datetime.datetime.now()}: {msg}\n")
-    except Exception:
-        pass
+    """No-op: debug file logging removed for security (PII exposure risk)."""
+    pass
 
 
 class LineWebhookController(http.Controller):
@@ -41,8 +35,6 @@ class LineWebhookController(http.Controller):
             dict: Empty dict on success (LINE expects 200 OK).
         """
         _logger.info('LINE webhook: Received request for channel_id=%s', channel_id)
-        _log_to_file(f'Received request for channel_id={channel_id}')
-        _logger.info('LINE webhook: Headers=%s', dict(request.httprequest.headers))
 
         livechat_channel = request.env['im_livechat.channel'].sudo().browse(channel_id)
         if not livechat_channel.exists() or not livechat_channel.line_enabled:
