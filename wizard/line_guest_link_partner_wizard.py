@@ -35,24 +35,25 @@ class LineGuestLinkPartnerWizard(models.TransientModel):
         if self.guest_id.line_user_id:
             LineUser = self.env['line.user'].sudo()
             line_user = LineUser.search(
-                [('line_uid', '=', self.guest_id.line_user_id)], limit=1,
+                [('line_user_id', '=', self.guest_id.line_user_id)], limit=1,
             )
             if line_user:
                 # Update existing line.user to point to this partner
                 if line_user.partner_id != self.partner_id:
-                    line_user.write({'partner_id': self.partner_id.id})
+                    line_user.bind_partner(self.partner_id.id)
             else:
-                # Create new line.user record bound to the partner
-                LineUser.create_or_update_from_webhook(
+                # Create new line.user record — skip auto-bind since we
+                # already know the target partner
+                LineUser.with_context(
+                    skip_auto_bind=True,
+                ).create_or_update_from_webhook(
                     self.guest_id.line_user_id,
                     {'displayName': self.partner_id.name},
                 )
-                # Re-search to bind partner (create_or_update_from_webhook may
-                # not set partner_id automatically)
                 line_user = LineUser.search(
-                    [('line_uid', '=', self.guest_id.line_user_id)], limit=1,
+                    [('line_user_id', '=', self.guest_id.line_user_id)], limit=1,
                 )
-                if line_user and line_user.partner_id != self.partner_id:
-                    line_user.write({'partner_id': self.partner_id.id})
+                if line_user:
+                    line_user.bind_partner(self.partner_id.id)
 
         return {'type': 'ir.actions.act_window_close'}
