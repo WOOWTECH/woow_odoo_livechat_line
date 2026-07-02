@@ -585,6 +585,10 @@ Common issues and their solutions:
 | Video messages show a blank preview in LINE | The static `video_preview.png` file is missing or inaccessible | Verify that `/woow_odoo_livechat_line/static/img/video_preview.png` exists and is served correctly. Test by visiting the URL directly in a browser. |
 | Webhook URL shows `False` in the channel form | The LiveChat channel record has not been saved yet | Save the channel record first. The webhook URL is computed from the record ID, which does not exist until the first save. |
 | Messages from LINE appear but operator replies fail silently | `_send_to_line_if_applicable()` caught an exception | Check Odoo logs for `LINE push error` or `Error sending to LINE`. The error is logged but never raised to avoid blocking the operator's Discuss workflow. |
+| Livechat channel shows no LINE messages | Channel `line_channel_id` not set | Edit livechat channel → fill LINE Messaging Channel ID |
+| Reply goes to wrong LINE user | `mail.guest.line_user_id` mismatch | Check guest record binding; see "Manual `line_user_id` Editing Risk" section |
+| Audio message has wrong duration in LINE | Hardcoded 60s default | Known limitation; LINE requires duration but Odoo doesn't extract it from the file |
+| Operator offline, LINE user can't get response | Operator left mid-conversation | Other operators with channel access can reply; see "Multi-Operator Offline Scenarios" |
 
 ---
 
@@ -857,21 +861,70 @@ LINE retries webhook delivery if the endpoint returns a non-200 status or times 
 
 Each LINE user gets a unique `mail.guest` record (identified by `line_user_id` field). If the constraint fails (e.g., during concurrent webhook processing), the exception is caught and the existing guest is reused.
 
+### Manual `line_user_id` Editing Risk
+
+The `mail.guest.line_user_id` field is writable by operators with livechat admin access. If an operator manually changes this field to another LINE user's UID, replies will be sent to the wrong person.
+
+**Mitigation:** The field is `readonly=True` in the UI form view. Direct ORM writes are only prevented by access group restrictions. For high-security environments, add a `_constrains` method that validates `line_user_id` format (`U` + 32 hex chars).
+
 ---
 
-## Troubleshooting
+## Guest Creation & Binding Flow
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| Webhook returns 200 but no message in Discuss | Signature verification failed silently | Check `line_channel_secret` on livechat channel matches LINE Console |
-| Messages appear in Discuss but replies don't reach LINE | `access_token` is None or expired | Re-issue long-lived token in LINE Console |
-| "LINE User" generic name persists | Profile API failed (rate limit or invalid token) | Check logs for `LINE webhook: Profile fetch failed` |
-| Duplicate messages in Discuss | LINE retried the webhook | Check network stability; see deduplication note above |
-| Images show as text links in LINE | `web.base.url` is HTTP, not HTTPS | Set `web.base.url` to HTTPS domain |
-| Video messages show blank preview | `video_preview.png` missing or inaccessible | Verify file exists at `static/img/video_preview.png` |
-| Livechat channel shows no LINE messages | Channel `line_channel_id` not set | Edit livechat channel → fill LINE Messaging Channel ID |
-| Reply goes to wrong LINE user | `mail.guest.line_user_id` mismatch | Check guest record binding; may need manual fix |
-| Audio message has wrong duration | Hardcoded 60s default | Known limitation; LINE requires duration but Odoo doesn't extract it |
+```
+Incoming webhook message from LINE UID
+    │
+    ▼
+_get_or_create_guest(line_uid, channel)
+    │
+    ├── Search mail.guest by line_user_id
+    │   ├── FOUND → return existing guest
+    │   └── NOT FOUND
+    │       │
+    │       ├── _fetch_line_profile(line_uid)
+    │       │   ├── SUCCESS → display_name from profile
+    │       │   └── FAIL → fallback to "LINE User"
+    │       │
+    │       ├── Create mail.guest record
+    │       │   └── line_user_id = line_uid
+    │       │   └── name = display_name
+    │       │
+    │       ├── Search line.user by line_uid
+    │       │   ├── FOUND → check partner_id
+    │       │   │   ├── HAS PARTNER → set guest.line_partner_id
+    │       │   │   └── NO PARTNER → skip
+    │       │   └── NOT FOUND → skip
+    │       │
+    │       └── Return new guest
+    │
+    ▼
+Guest used to post message in Discuss channel
+```
+
+### Multi-Operator Offline Scenarios
+
+When an operator assigned to a livechat channel goes offline mid-conversation:
+
+- The conversation remains in the **same Discuss channel** — it is not reassigned.
+- New messages from the LINE user are still delivered to the channel.
+- Other operators with access to the channel can see and reply.
+- LINE messages are always sent via `push_message()` (not reply token), so there is no timeout issue for delayed responses.
+
+---
+
+## Dependencies on `woow_line_base` Methods
+
+| This module calls | woow_line_base method | Context |
+|-------------------|-----------------------|---------|
+| Webhook controller | `verify_webhook_signature()` | Every incoming POST |
+| Webhook controller | `get_profile()` | Guest creation |
+| Webhook controller | `line.user.create_or_update_from_webhook()` | Every message event |
+| Outbound reply | `push_message()` | Sending operator replies to LINE |
+| Outbound reply | `build_text_message()` | Constructing text replies |
+| Outbound reply | `build_image_message()` | Constructing image replies |
+| Outbound reply | `get_content()` | Downloading media from LINE |
+| Guest creation | `line.user.find_by_line_uid()` | Partner lookup for guest binding |
+| Guest creation | `line.user._sync_to_mail_guest()` | Bidirectional binding sync |
 
 ---
 
@@ -891,3 +944,21 @@ odoo-bin -d testdb --test-tags=/woow_odoo_livechat_line -k test_webhook_message_
 # from woow_odoo_livechat_line.tests.common import make_webhook_event
 # event = make_webhook_event(message_type='text', text='Hello')
 ```
+
+### Testing Webhooks with curl
+
+```bash
+# Generate a test webhook payload
+PAYLOAD='{"events":[{"type":"message","message":{"type":"text","id":"123","text":"Hello"},"source":{"type":"user","userId":"U1234567890abcdef1234567890abcde"},"replyToken":"test","timestamp":1234567890000}]}'
+
+# Calculate HMAC-SHA256 signature (replace CHANNEL_SECRET)
+SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "YOUR_CHANNEL_SECRET" -binary | base64)
+
+# Send the webhook
+curl -X POST https://your-domain.com/line/webhook/1 \
+  -H "Content-Type: application/json" \
+  -H "X-Line-Signature: $SIGNATURE" \
+  -d "$PAYLOAD"
+```
+
+> **Note:** The `replyToken` must be a valid token from LINE for `reply()` calls to work. For testing, use `push_message()` instead (which does not require a reply token).
