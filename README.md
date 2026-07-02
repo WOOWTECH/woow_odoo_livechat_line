@@ -18,19 +18,21 @@
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Position in the LINE Integration Suite](#position-in-the-line-integration-suite)
-3. [Architecture](#architecture)
-4. [Message Flow Diagrams](#message-flow-diagrams)
-5. [Models Reference](#models-reference)
-6. [Wizard Reference](#wizard-reference)
-7. [Controller Reference](#controller-reference)
-8. [Supported Message Types](#supported-message-types)
-9. [Multi-Tenant Architecture](#multi-tenant-architecture)
-10. [Security](#security)
-11. [File Structure](#file-structure)
-12. [Configuration Checklist](#configuration-checklist)
-13. [Testing](#testing)
-14. [For AI Agents](#for-ai-agents)
+2. [Quick Start](#quick-start)
+3. [Position in the LINE Integration Suite](#position-in-the-line-integration-suite)
+4. [Architecture](#architecture)
+5. [Message Flow Diagrams](#message-flow-diagrams)
+6. [Models Reference](#models-reference)
+7. [Wizard Reference](#wizard-reference)
+8. [Controller Reference](#controller-reference)
+9. [Supported Message Types](#supported-message-types)
+10. [Multi-Tenant Architecture](#multi-tenant-architecture)
+11. [Security](#security)
+12. [File Structure](#file-structure)
+13. [Configuration Checklist](#configuration-checklist)
+14. [Testing](#testing)
+15. [Troubleshooting](#troubleshooting)
+16. [For AI Agents](#for-ai-agents)
 
 ---
 
@@ -39,6 +41,21 @@
 This module turns Odoo Discuss into a LINE customer service console. When a customer sends a message through the LINE app, a webhook delivers the event to Odoo, where it is converted into a standard `mail.message` inside a LiveChat `discuss.channel`. Operators reply from Discuss, and the module intercepts those replies and pushes them back to LINE via the Push Message API.
 
 Full support for rich media: text, image, video, audio, file, sticker, and location messages flow in both directions.
+
+---
+
+## Quick Start
+
+Get LINE messages flowing into Odoo Discuss in six steps:
+
+1. **Install the module** -- go to Odoo Apps, search for `woow_odoo_livechat_line`, and click Install. The dependency `woow_line_base` will be installed automatically if not already present.
+2. **Create a LiveChat channel** -- navigate to **Live Chat > Configuration > Channels** and create a new channel (e.g. "LINE Support"). Assign at least one operator.
+3. **Enable the LINE tab** -- open the channel form, go to the **LINE** tab, and toggle **LINE Integration** on.
+4. **Enter credentials** -- paste the **Channel ID** and **Channel Secret** from the LINE Developers Console (Messaging API channel > Basic settings).
+5. **Copy the webhook URL** -- the **Webhook URL** field is auto-computed (e.g. `https://your-odoo.com/line/webhook/42`). Click the copy icon, then paste it into the LINE Developers Console under Messaging API > Webhook settings. Enable the webhook toggle there.
+6. **Send a test message** -- open the LINE app on your phone, find the Official Account, and send a text message. It should appear in the operator's Discuss inbox within seconds.
+
+> **Tip:** Disable **Auto-reply messages** and **Greeting messages** in the LINE Console to prevent the default LINE bot replies from conflicting with your operators' responses.
 
 ---
 
@@ -265,6 +282,17 @@ Transient model that allows operators to bind a LINE guest to an existing `res.p
 6. Routes each event to the appropriate handler (each in its own try/except)
 7. Returns `{}` (LINE expects HTTP 200 with empty response)
 
+#### Webhook route conflict with `woow_odoo_line_liff`
+
+When both `woow_odoo_livechat_line` and `woow_odoo_line_liff` are installed on the same Odoo instance, both modules register a handler for `/line/webhook/<int:channel_id>`. In this scenario:
+
+| Mode | Which controller handles the webhook | How this module is invoked |
+|------|--------------------------------------|----------------------------|
+| **Co-installed** (common) | `woow_odoo_line_liff`'s controller takes precedence. It processes LIFF-specific events (e.g., Rich Menu postbacks, audience syncs) and then calls `_forward_to_livechat()` to programmatically invoke this module's message handling logic for `message` and `follow` events. | Programmatically via `_forward_to_livechat()` -- no direct HTTP route hit. |
+| **Standalone** (this module only) | This module's `LineWebhookController` handles `/line/webhook/<int:channel_id>` directly. | Direct HTTP POST from LINE Platform. |
+
+**Key clarification on the URL parameter:** The `channel_id` in `/line/webhook/<int:channel_id>` refers to the `im_livechat.channel` record ID -- the LiveChat channel configured under **Live Chat > Configuration > Channels**. It is NOT the `line.liff.config` record ID used by `woow_odoo_line_liff`. When registering the webhook URL in the LINE Developers Console, always use the ID shown in the **Webhook URL** computed field on the LiveChat channel form.
+
 #### Event routing: `_process_event(event, livechat_channel)`
 
 | Event type | Handler | Description |
@@ -280,6 +308,17 @@ Transient model that allows operators to bind a LINE guest to an existing `res.p
 - **New guest:** Fetches LINE profile via `_fetch_line_profile()`, creates `mail.guest` with display name (falls back to `"LINE User"`), calls `line.user.create_or_update_from_webhook()` to establish identity in `woow_line_base`, auto-links `line_partner_id` if partner exists on the `line.user`
 - **Existing guest with generic name** (`"LINE User"` or empty) **or missing partner:** Re-fetches profile to update display name and re-checks partner binding
 - **Existing guest with proper name and partner:** No API call (profile caching strategy)
+
+#### Profile fetching: `_fetch_line_profile(line_user_id, livechat_channel)`
+
+Retrieves the LINE user's display name and profile picture URL from the LINE Platform.
+
+| Aspect | Detail |
+|--------|--------|
+| **Parameters** | `line_user_id` (`str`) -- the LINE user's unique identifier (e.g. `U1234...`). `livechat_channel` (`im_livechat.channel` recordset) -- used to read `line_channel_id` and `line_channel_secret` for API authentication. |
+| **Returns** | `dict` with keys `displayName` (str), `pictureUrl` (str, optional), `statusMessage` (str, optional) on success. Returns `{}` (empty dict) on any failure (network error, invalid token, expired user, etc.). |
+| **Called by** | `_get_or_create_guest()` -- invoked when creating a new guest or when an existing guest still has the generic name `"LINE User"`. |
+| **Implementation** | Calls `line.api.service.get_access_token(channel_id, channel_secret)` to obtain an OAuth token, then calls `line.api.service.get_profile(line_user_id, access_token)`. Errors are caught and logged; the empty dict fallback ensures guest creation proceeds with the generic name. |
 
 #### Channel management: `_get_or_create_discuss_channel(line_user_id, guest, livechat_channel)`
 
@@ -391,6 +430,19 @@ All other models (`im_livechat.channel`, `discuss.channel`, `mail.guest`, `mail.
 - URLs include the `access_token` query parameter: `/web/image/{id}?access_token={token}`
 - Without the token, Odoo returns 403 for non-authenticated requests
 
+### Webhook Retry & Deduplication (Webhook 重試與去重)
+
+LINE Platform retries webhook delivery when it receives a non-200 HTTP response or when the server does not respond within 60 seconds. This module mitigates retry-related issues as follows:
+
+| Aspect | Behavior |
+|--------|----------|
+| **HTTP response** | The webhook controller always returns `{}` with HTTP 200 OK, even when event processing fails internally. This prevents LINE from retrying. |
+| **Error isolation** | Each event in the `events[]` array is processed in its own try/except block. A failure in one event does not cause a non-200 response that would trigger a retry of the entire payload. |
+| **Deduplication** | This module does **not** deduplicate by `webhookEventId`. LINE includes a unique `webhookEventId` in each event, but this module does not track or check it. |
+| **Practical risk** | Retries are rare in practice because the controller consistently returns 200. Duplicate messages would only occur if the Odoo server crashes or times out mid-processing (>60s), which is uncommon for the lightweight webhook handler. |
+
+> **Note:** If your deployment experiences timeouts (e.g., slow database, large attachment downloads), consider adding deduplication by storing processed `webhookEventId` values in a transient model or cache.
+
 ---
 
 ## File Structure
@@ -496,10 +548,43 @@ All tests extend `LineTransactionCase` (from `tests/common.py`) which provides:
 | 12 | `test_phase12_data_governance.py` | 18 | SQL unique constraints, data integrity, validation errors |
 | 13 | `test_phase13_operations.py` | 18 | Operational scenarios: profile updates, channel reuse, batch sending |
 
-Run tests:
+### Running Tests
+
 ```bash
+# Run all tests for this module
+odoo-bin -d <database> -i woow_odoo_livechat_line --test-enable --stop-after-init
+
+# Run all tests with the post_install tag (recommended for CI)
 odoo-bin -d <database> -i woow_odoo_livechat_line --test-enable --stop-after-init --test-tags=post_install
+
+# Run a single test class (e.g., all tests in Phase 06)
+odoo-bin -d <database> -i woow_odoo_livechat_line --test-enable --stop-after-init -k TestPhase06Deployment
+
+# Run a single test method
+odoo-bin -d <database> -i woow_odoo_livechat_line --test-enable --stop-after-init -k test_webhook_message_text
+
+# Run tests with verbose logging to see LINE webhook debug output
+odoo-bin -d <database> -i woow_odoo_livechat_line --test-enable --stop-after-init --log-level=debug
 ```
+
+> **Note:** The `-k` flag filters test classes or methods by name substring. All tests are `post_install`, meaning the module must be installed (or installed via `-i`) before tests run.
+
+---
+
+## Troubleshooting
+
+Common issues and their solutions:
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Webhook returns 200 but no message appears in Discuss | HMAC-SHA256 signature verification failed silently (invalid signatures are rejected without error response) | Verify that the `line_channel_secret` in Odoo matches the Channel Secret in the LINE Developers Console. Check Odoo logs for `LINE webhook: Signature verification failed`. |
+| Operator replies do not reach the LINE user | LINE Channel Access Token is expired or not issued | Go to the LINE Developers Console > Messaging API > Channel Access Token and re-issue a long-lived token. The `woow_line_base` module caches tokens in memory; restart Odoo if needed. |
+| Guest name shows as "LINE User" instead of actual name | Profile API call failed (network error, rate limit, or blocked user) | Check Odoo logs for `LINE webhook: Failed to fetch profile`. The profile will be re-fetched on the user's next message if the name is still generic. |
+| Duplicate messages appear in Discuss | LINE retried the webhook because a previous request timed out or returned non-200 | See the [Webhook Retry & Deduplication](#webhook-retry--deduplication-webhook-重試與去重) section. Ensure Odoo responds within 60 seconds. |
+| Images sent from Odoo appear as text links in LINE | `web.base.url` system parameter is set to `http://` instead of `https://` | Set `web.base.url` to your public HTTPS URL in **Settings > Technical > System Parameters**. LINE Messaging API rejects all `http://` media URLs. |
+| Video messages show a blank preview in LINE | The static `video_preview.png` file is missing or inaccessible | Verify that `/woow_odoo_livechat_line/static/img/video_preview.png` exists and is served correctly. Test by visiting the URL directly in a browser. |
+| Webhook URL shows `False` in the channel form | The LiveChat channel record has not been saved yet | Save the channel record first. The webhook URL is computed from the record ID, which does not exist until the first save. |
+| Messages from LINE appear but operator replies fail silently | `_send_to_line_if_applicable()` caught an exception | Check Odoo logs for `LINE push error` or `Error sending to LINE`. The error is logged but never raised to avoid blocking the operator's Discuss workflow. |
 
 ---
 
@@ -722,3 +807,87 @@ To support a new LINE message type (e.g., `imagemap`, `template`, `flex`):
 | Token validity | 30 days | `woow_line_base` (upstream) | Access token cache TTL (in-memory, reset on restart) |
 | Video preview path | `static/img/video_preview.png` | `discuss_channel.py` line 101 | Static fallback for video thumbnails |
 | Debug log file | `/tmp/line_webhook_debug.log` | `webhook.py` line 18 | Append-only debug log for containerized envs |
+
+---
+
+## Webhook Route Conflict with woow_odoo_line_liff
+
+When **both** modules are installed, the bridge module (`woow_odoo_line_liff`) takes precedence for the `/line/webhook/<int:config_id>` route due to Odoo's route registration order.
+
+### Standalone Mode (this module only)
+
+```
+LINE Platform → POST /line/webhook/<int:channel_id>
+                                        ↑
+                                im_livechat.channel.id
+```
+
+The URL parameter is `im_livechat.channel.id`. Credential lookup uses the livechat channel's LINE fields.
+
+### With Bridge Module Installed
+
+```
+LINE Platform → POST /line/webhook/<int:config_id>
+    │                                   ↑
+    │                          line.liff.config.id
+    ▼
+woow_odoo_line_liff webhook (handles ALL events)
+    │
+    └── _forward_to_livechat(event)  ← dynamic import
+        │
+        ▼
+    THIS module's controller (invoked programmatically)
+```
+
+**Consequence:** This module's webhook controller is **NEVER called directly via HTTP** when `woow_odoo_line_liff` is installed. It is only invoked programmatically via the bridge module's forwarding mechanism.
+
+---
+
+## Webhook Retries & Deduplication
+
+LINE retries webhook delivery if the endpoint returns a non-200 status or times out (60 seconds). This module **always returns HTTP 200** (even on internal errors) to prevent retries.
+
+**Known limitation:** The module does **NOT** perform deduplication based on `event.webhookEventId`. If LINE retries despite receiving 200 (rare, caused by network issues), duplicate `mail.message` records may be created in Discuss.
+
+**Mitigation:** In practice, LINE retries are rare when the endpoint consistently returns 200. If deduplication is critical, override `_create_message()` to check for recent messages with identical content within a short time window.
+
+---
+
+## mail.guest Unique Constraint
+
+Each LINE user gets a unique `mail.guest` record (identified by `line_user_id` field). If the constraint fails (e.g., during concurrent webhook processing), the exception is caught and the existing guest is reused.
+
+---
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Webhook returns 200 but no message in Discuss | Signature verification failed silently | Check `line_channel_secret` on livechat channel matches LINE Console |
+| Messages appear in Discuss but replies don't reach LINE | `access_token` is None or expired | Re-issue long-lived token in LINE Console |
+| "LINE User" generic name persists | Profile API failed (rate limit or invalid token) | Check logs for `LINE webhook: Profile fetch failed` |
+| Duplicate messages in Discuss | LINE retried the webhook | Check network stability; see deduplication note above |
+| Images show as text links in LINE | `web.base.url` is HTTP, not HTTPS | Set `web.base.url` to HTTPS domain |
+| Video messages show blank preview | `video_preview.png` missing or inaccessible | Verify file exists at `static/img/video_preview.png` |
+| Livechat channel shows no LINE messages | Channel `line_channel_id` not set | Edit livechat channel → fill LINE Messaging Channel ID |
+| Reply goes to wrong LINE user | `mail.guest.line_user_id` mismatch | Check guest record binding; may need manual fix |
+| Audio message has wrong duration | Hardcoded 60s default | Known limitation; LINE requires duration but Odoo doesn't extract it |
+
+---
+
+## Running Individual Tests
+
+```bash
+# All tests
+odoo-bin -d testdb -i woow_odoo_livechat_line --test-enable --stop-after-init
+
+# Single test class
+odoo-bin -d testdb --test-tags=/woow_odoo_livechat_line -k TestWebhookMessage
+
+# Single test method
+odoo-bin -d testdb --test-tags=/woow_odoo_livechat_line -k test_webhook_message_text
+
+# Using make_webhook_event helper in tests:
+# from woow_odoo_livechat_line.tests.common import make_webhook_event
+# event = make_webhook_event(message_type='text', text='Hello')
+```
