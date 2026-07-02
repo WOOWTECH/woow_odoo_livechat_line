@@ -567,7 +567,35 @@ odoo-bin -d <database> -i woow_odoo_livechat_line --test-enable --stop-after-ini
 odoo-bin -d <database> -i woow_odoo_livechat_line --test-enable --stop-after-init --log-level=debug
 ```
 
-> **Note:** The `-k` flag filters test classes or methods by name substring. All tests are `post_install`, meaning the module must be installed (or installed via `-i`) before tests run.
+> **Note:** The `-k` flag filters test classes or methods by name substring. Use `--test-tags=/woow_odoo_livechat_line` as an alternative to `-k` for module-scoped filtering. All tests are `post_install`.
+
+### Testing Webhooks with curl
+
+```bash
+# Generate a test webhook payload
+PAYLOAD='{"events":[{"type":"message","message":{"type":"text","id":"123","text":"Hello"},"source":{"type":"user","userId":"U1234567890abcdef1234567890abcde"},"replyToken":"test","timestamp":1234567890000}]}'
+
+# Calculate HMAC-SHA256 signature (replace YOUR_CHANNEL_SECRET)
+SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "YOUR_CHANNEL_SECRET" -binary | base64)
+
+# Send the webhook
+curl -X POST https://your-domain.com/line/webhook/1 \
+  -H "Content-Type: application/json" \
+  -H "X-Line-Signature: $SIGNATURE" \
+  -d "$PAYLOAD"
+```
+
+> The `replyToken` must be valid for `reply()` calls. For testing, replies will fail silently — use `push_message()` for manual testing instead.
+
+### Using Test Helpers
+
+```python
+# In test code:
+from woow_odoo_livechat_line.tests.common import make_webhook_event
+
+event = make_webhook_event(message_type='text', text='Hello')
+self._call_controller_directly(self.livechat_channel.id, [event])
+```
 
 ---
 
@@ -924,41 +952,4 @@ When an operator assigned to a livechat channel goes offline mid-conversation:
 | Outbound reply | `build_image_message()` | Constructing image replies |
 | Outbound reply | `get_content()` | Downloading media from LINE |
 | Guest creation | `line.user.find_by_line_uid()` | Partner lookup for guest binding |
-| Guest creation | `line.user._sync_to_mail_guest()` | Bidirectional binding sync |
-
----
-
-## Running Individual Tests
-
-```bash
-# All tests
-odoo-bin -d testdb -i woow_odoo_livechat_line --test-enable --stop-after-init
-
-# Single test class
-odoo-bin -d testdb --test-tags=/woow_odoo_livechat_line -k TestWebhookMessage
-
-# Single test method
-odoo-bin -d testdb --test-tags=/woow_odoo_livechat_line -k test_webhook_message_text
-
-# Using make_webhook_event helper in tests:
-# from woow_odoo_livechat_line.tests.common import make_webhook_event
-# event = make_webhook_event(message_type='text', text='Hello')
-```
-
-### Testing Webhooks with curl
-
-```bash
-# Generate a test webhook payload
-PAYLOAD='{"events":[{"type":"message","message":{"type":"text","id":"123","text":"Hello"},"source":{"type":"user","userId":"U1234567890abcdef1234567890abcde"},"replyToken":"test","timestamp":1234567890000}]}'
-
-# Calculate HMAC-SHA256 signature (replace CHANNEL_SECRET)
-SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "YOUR_CHANNEL_SECRET" -binary | base64)
-
-# Send the webhook
-curl -X POST https://your-domain.com/line/webhook/1 \
-  -H "Content-Type: application/json" \
-  -H "X-Line-Signature: $SIGNATURE" \
-  -d "$PAYLOAD"
-```
-
-> **Note:** The `replyToken` must be a valid token from LINE for `reply()` calls to work. For testing, use `push_message()` instead (which does not require a reply token).
+| Guest creation | `line.user._sync_to_mail_guest()` | Bidirectional binding sync (called by `woow_line_base` when this module's `mail.guest.line_user_id` field is detected) |
