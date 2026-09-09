@@ -1,11 +1,22 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import html
 import logging
 import re
 
 from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
+
+# Block-level closing tags that should become a line break instead of just
+# vanishing, so multi-line templates (e.g. appointment reminders) don't get
+# smashed into one run-on line when converted to LINE plain text.
+_BLOCK_CLOSE_RE = re.compile(r'</(?:p|div|li|ul|ol|h[1-6]|tr|table|blockquote|section|article)\s*>',
+                              re.IGNORECASE)
+_LI_OPEN_RE = re.compile(r'<li[^>]*>', re.IGNORECASE)
+_BR_RE = re.compile(r'<br\s*/?>', re.IGNORECASE)
+_TAG_RE = re.compile(r'<[^>]+>')
+_MULTI_BLANK_RE = re.compile(r'\n{3,}')
 
 
 class DiscussChannel(models.Model):
@@ -56,8 +67,7 @@ class DiscussChannel(models.Model):
 
         # Process text content
         body = message.body or ''
-        # Strip HTML tags for LINE
-        text = re.sub(r'<[^>]+>', '', body).strip()
+        text = self._line_html_to_text(body)
         if text:
             messages.append(line_api.build_text_message(text))
 
@@ -146,6 +156,35 @@ class DiscussChannel(models.Model):
                     _logger.info('LINE: Sent %s messages to user %s', len(batch), self.line_user_id)
                 else:
                     _logger.error('LINE: Failed to send messages to user %s', self.line_user_id)
+
+    def _line_html_to_text(self, body):
+        """Convert a mail.message HTML body into LINE-friendly plain text.
+
+        A naive tag-strip (the previous implementation) drops block
+        boundaries entirely, so e.g. `<div>A<br/>B</div>` becomes "AB" and
+        multi-line templates like appointment reminders collapse into one
+        unreadable run-on line. This converts block-ending tags and <br>
+        into real newlines first, turns <li> into a bullet, THEN strips
+        the remaining tags and unescapes HTML entities (so "A &amp; B"
+        becomes "A & B" instead of staying escaped).
+
+        Args:
+            body: str, HTML body from mail.message.
+
+        Returns:
+            str: plain text with real line breaks, suitable for a LINE
+            text message.
+        """
+        if not body:
+            return ''
+        text = _BR_RE.sub('\n', body)
+        text = _LI_OPEN_RE.sub('• ', text)
+        text = _BLOCK_CLOSE_RE.sub('\n', text)
+        text = _TAG_RE.sub('', text)
+        text = html.unescape(text)
+        text = '\n'.join(line.strip() for line in text.split('\n'))
+        text = _MULTI_BLANK_RE.sub('\n\n', text)
+        return text.strip()
 
     def _ensure_https_url(self, url):
         """Ensure URL uses HTTPS protocol.
