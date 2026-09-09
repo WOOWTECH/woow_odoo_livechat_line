@@ -70,7 +70,13 @@ class DiscussChannel(models.Model):
         if not self.line_user_id or not self.livechat_channel_id:
             return
 
-        livechat_channel = self.livechat_channel_id
+        # sudo(): line_channel_id/line_channel_secret are restricted to
+        # im_livechat.im_livechat_group_manager (see B-1). This method runs
+        # for any operator replying in Discuss (typically Live Chat / User,
+        # not a manager), so without sudo() here get_access_token() below
+        # would always receive empty credentials and every reply would
+        # silently fail to reach LINE.
+        livechat_channel = self.livechat_channel_id.sudo()
         if not livechat_channel.line_enabled:
             return
 
