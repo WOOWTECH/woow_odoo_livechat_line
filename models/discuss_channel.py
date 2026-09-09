@@ -1,11 +1,22 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import html
 import logging
 import re
 
 from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
+
+# Block-level closing tags that should become a line break instead of just
+# vanishing, so multi-line templates (e.g. appointment reminders) don't get
+# smashed into one run-on line when converted to LINE plain text.
+_BLOCK_CLOSE_RE = re.compile(r'</(?:p|div|li|ul|ol|h[1-6]|tr|table|blockquote|section|article)\s*>',
+                              re.IGNORECASE)
+_LI_OPEN_RE = re.compile(r'<li[^>]*>', re.IGNORECASE)
+_BR_RE = re.compile(r'<br\s*/?>', re.IGNORECASE)
+_TAG_RE = re.compile(r'<[^>]+>')
+_MULTI_BLANK_RE = re.compile(r'\n{3,}')
 
 
 class DiscussChannel(models.Model):
@@ -26,6 +37,29 @@ class DiscussChannel(models.Model):
         help='Profile picture URL from LINE.',
     )
 
+    def _post_line_delivery_failure(self, reason):
+        """Post a visible warning in the channel when a reply failed to reach LINE.
+
+        Without this, the operator sees their message posted normally in
+        Discuss and assumes it reached the customer, with no signal that it
+        didn't (access token failure, blocked/unfollowed user, LINE API
+        error, ...). Uses from_line_webhook=True so this system notice
+        doesn't itself get treated as an operator reply and relayed back
+        out to LINE (see mail_message.py's create() override).
+
+        Args:
+            reason: str, human-readable failure reason to show operators.
+        """
+        self.ensure_one()
+        try:
+            self.with_context(from_line_webhook=True).message_post(
+                body=f'⚠️ 這則訊息未能送達 LINE：{reason}',
+                message_type='comment',
+                subtype_xmlid='mail.mt_comment',
+            )
+        except Exception:
+            _logger.exception('LINE: Failed to post delivery-failure notice to channel %s', self.id)
+
     def _notify_line_user(self, message):
         """Send message to LINE user.
 
@@ -36,7 +70,13 @@ class DiscussChannel(models.Model):
         if not self.line_user_id or not self.livechat_channel_id:
             return
 
-        livechat_channel = self.livechat_channel_id
+        # sudo(): line_channel_id/line_channel_secret are restricted to
+        # im_livechat.im_livechat_group_manager (see B-1). This method runs
+        # for any operator replying in Discuss (typically Live Chat / User,
+        # not a manager), so without sudo() here get_access_token() below
+        # would always receive empty credentials and every reply would
+        # silently fail to reach LINE.
+        livechat_channel = self.livechat_channel_id.sudo()
         if not livechat_channel.line_enabled:
             return
 
@@ -49,6 +89,7 @@ class DiscussChannel(models.Model):
         )
         if not access_token:
             _logger.error('LINE: Failed to get access token for channel %s', livechat_channel.id)
+            self._post_line_delivery_failure('無法取得 LINE Access Token，請確認 LINE Channel ID / Secret 設定是否正確。')
             return
 
         # Build messages
@@ -56,8 +97,7 @@ class DiscussChannel(models.Model):
 
         # Process text content
         body = message.body or ''
-        # Strip HTML tags for LINE
-        text = re.sub(r'<[^>]+>', '', body).strip()
+        text = self._line_html_to_text(body)
         if text:
             messages.append(line_api.build_text_message(text))
 
@@ -139,13 +179,50 @@ class DiscussChannel(models.Model):
             # LINE allows max 5 messages per push request
             for i in range(0, len(messages), 5):
                 batch = messages[i:i + 5]
-                success = line_api.push_message(
-                    self.line_user_id, batch, access_token=access_token,
+                # Call _push_message_raw() directly instead of the public
+                # push_message() wrapper: same HTTP request, but it also
+                # gives us the status code so the failure notice below can
+                # say something more useful than "it failed".
+                success, status_code, _resp_text = line_api._push_message_raw(
+                    access_token, self.line_user_id, batch,
                 )
                 if success:
                     _logger.info('LINE: Sent %s messages to user %s', len(batch), self.line_user_id)
                 else:
                     _logger.error('LINE: Failed to send messages to user %s', self.line_user_id)
+                    self._post_line_delivery_failure(
+                        f'LINE API 回應失敗（HTTP {status_code}）。' if status_code
+                        else 'LINE API 無回應（網路錯誤）。'
+                    )
+
+    def _line_html_to_text(self, body):
+        """Convert a mail.message HTML body into LINE-friendly plain text.
+
+        A naive tag-strip (the previous implementation) drops block
+        boundaries entirely, so e.g. `<div>A<br/>B</div>` becomes "AB" and
+        multi-line templates like appointment reminders collapse into one
+        unreadable run-on line. This converts block-ending tags and <br>
+        into real newlines first, turns <li> into a bullet, THEN strips
+        the remaining tags and unescapes HTML entities (so "A &amp; B"
+        becomes "A & B" instead of staying escaped).
+
+        Args:
+            body: str, HTML body from mail.message.
+
+        Returns:
+            str: plain text with real line breaks, suitable for a LINE
+            text message.
+        """
+        if not body:
+            return ''
+        text = _BR_RE.sub('\n', body)
+        text = _LI_OPEN_RE.sub('• ', text)
+        text = _BLOCK_CLOSE_RE.sub('\n', text)
+        text = _TAG_RE.sub('', text)
+        text = html.unescape(text)
+        text = '\n'.join(line.strip() for line in text.split('\n'))
+        text = _MULTI_BLANK_RE.sub('\n\n', text)
+        return text.strip()
 
     def _ensure_https_url(self, url):
         """Ensure URL uses HTTPS protocol.

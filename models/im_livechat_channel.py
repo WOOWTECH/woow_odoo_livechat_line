@@ -15,10 +15,12 @@ class ImLivechatChannel(models.Model):
     )
     line_channel_id = fields.Char(
         string='LINE Channel ID',
+        groups='im_livechat.im_livechat_group_manager',
         help='Channel ID from LINE Developers Console.',
     )
     line_channel_secret = fields.Char(
         string='LINE Channel Secret',
+        groups='im_livechat.im_livechat_group_manager',
         help='Channel Secret from LINE Developers Console.',
     )
     line_webhook_url = fields.Char(
@@ -31,12 +33,19 @@ class ImLivechatChannel(models.Model):
     def _check_line_config(self):
         """Validate LINE configuration when enabled."""
         for record in self:
-            if record.line_enabled:
-                if not record.line_channel_id:
+            # sudo(): line_channel_id/line_channel_secret are restricted to
+            # im_livechat.im_livechat_group_manager (see B-1). Any Live Chat
+            # / User with write access to this record (not just managers)
+            # can trigger this constrain, so reading the restricted fields
+            # without sudo() would raise AccessError instead of the
+            # intended ValidationError.
+            record_sudo = record.sudo()
+            if record_sudo.line_enabled:
+                if not record_sudo.line_channel_id:
                     raise ValidationError(
                         "LINE Channel ID is required when LINE integration is enabled."
                     )
-                if not record.line_channel_secret:
+                if not record_sudo.line_channel_secret:
                     raise ValidationError(
                         "LINE Channel Secret is required when LINE integration is enabled."
                     )
