@@ -15,10 +15,12 @@ class ImLivechatChannel(models.Model):
     )
     line_channel_id = fields.Char(
         string='LINE Channel ID',
+        groups='im_livechat.im_livechat_group_manager',
         help='Channel ID from LINE Developers Console.',
     )
     line_channel_secret = fields.Char(
         string='LINE Channel Secret',
+        groups='im_livechat.im_livechat_group_manager',
         help='Channel Secret from LINE Developers Console.',
     )
     line_webhook_url = fields.Char(
