@@ -4,7 +4,7 @@
 from odoo.tests import TransactionCase, tagged
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestChannelSecretAccess(TransactionCase):
     """B-1: the LINE credentials sat on a model that Portal and Public can
     read, with no ORM-level restriction at all."""
@@ -22,7 +22,7 @@ class TestChannelSecretAccess(TransactionCase):
         self.assertFalse(self.env['im_livechat.channel']._fields['line_enabled'].groups)
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestHtmlToText(TransactionCase):
     """H-1: operator replies arrived on the customer's phone as one run-on
     line, because a bare tag-strip drops every block boundary."""
@@ -53,7 +53,7 @@ class TestHtmlToText(TransactionCase):
         self.assertEqual(self.channel._line_html_to_text(False), '')
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestDeliveryFailureIsVisible(TransactionCase):
     """新-1: the operator reply path was the one caller using the low-level
     push that neither logs nor filters, so every failure was silent while
