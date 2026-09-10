@@ -161,7 +161,10 @@ class LineTestMixin:
     def _setup_line_livechat(self):
         """Create operator user + LiveChat channel with LINE config."""
         # Clear global token cache
-        from odoo.addons.woow_odoo_livechat_line.models.line_api import (
+        # The token cache lives in woow_line_base; this module never had a
+        # models/line_api.py, so the old import silently killed all 199 tests
+        # in this suite with ModuleNotFoundError at setUp.
+        from odoo.addons.woow_line_base.models.line_api_service import (
             _token_cache,
         )
         _token_cache.clear()

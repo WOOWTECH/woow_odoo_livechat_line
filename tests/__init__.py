@@ -7,3 +7,6 @@ from . import test_phase10_fault_recovery
 from . import test_phase11_monitoring
 from . import test_phase12_data_governance
 from . import test_phase13_operations
+from . import test_security_fixes
+from . import test_attack_surface
+from . import test_attachment_outbound
