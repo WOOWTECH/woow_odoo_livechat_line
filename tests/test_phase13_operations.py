@@ -21,10 +21,10 @@ from .common import (
     mock_line_token_response,
 )
 
-MOCK_POST = 'odoo.addons.woow_odoo_livechat_line.models.line_api.requests.post'
+MOCK_POST = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.post'
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestModuleUpgrade(LineTransactionCase):
     """Phase 13.1: Module upgrade and migration."""
 
@@ -56,28 +56,37 @@ class TestModuleUpgrade(LineTransactionCase):
         self.assertTrue(module.installed_version.startswith('18.0'))
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestLineAccountLifecycle(LineTransactionCase):
     """Phase 13.2: LINE account lifecycle."""
 
     @patch(MOCK_POST)
     def test_13_2_1_token_expiry_refresh(self, mock_post):
-        """Expired token triggers re-auth from LINE API."""
-        from odoo.addons.woow_odoo_livechat_line.models import line_api
-        line_api._token_cache.clear()
+        """Expired cached token triggers re-auth from LINE API.
 
-        # Populate cache with expired token
-        line_api._token_cache[FAKE_LINE_CHANNEL_ID] = {
-            'token': 'expired_token',
-            'expires_at': time.time() - 100,
-        }
-
-        mock_post.return_value = mock_line_token_response()
-        token = self.livechat_channel._line_get_access_token(
-            FAKE_LINE_CHANNEL_ID, FAKE_LINE_CHANNEL_SECRET,
+        Token caching moved to the shared woow_line_base
+        line.api.service; its cache key is (channel_id, secret_fingerprint)
+        via a private helper, so rather than reach into that derivation
+        this populates the cache through the public get_access_token seam
+        and then reads back whichever key it created to force expiry.
+        """
+        from odoo.addons.woow_line_base.models.line_api_service import (
+            _token_cache,
         )
+        api = self.env['line.api.service']
+        mock_post.return_value = mock_line_token_response()
+
+        api.get_access_token(FAKE_LINE_CHANNEL_ID, FAKE_LINE_CHANNEL_SECRET)
+        self.assertEqual(mock_post.call_count, 1)
+
+        (cache_key,) = _token_cache.keys()
+        _token_cache[cache_key]['expires_at'] = time.time() - 100
+
+        token = api.get_access_token(FAKE_LINE_CHANNEL_ID, FAKE_LINE_CHANNEL_SECRET)
         self.assertEqual(token, FAKE_LINE_ACCESS_TOKEN)
-        mock_post.assert_called_once()
+        self.assertEqual(
+            mock_post.call_count, 2,
+            'an expired cache entry must trigger a fresh OAuth call')
 
     def test_13_2_2_messaging_quota(self):
         """LINE messaging quota handling."""
@@ -103,7 +112,7 @@ class TestLineAccountLifecycle(LineTransactionCase):
         self.assertIn('new-domain.example.com', url)
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestIncidentResponse(LineTransactionCase):
     """Phase 13.3: Incident response."""
 
@@ -111,9 +120,9 @@ class TestIncidentResponse(LineTransactionCase):
     def test_13_3_1_line_platform_outage(self, mock_post):
         """LINE platform 5xx returns False (no crash)."""
         mock_post.return_value = mock_line_push_response(success=False)
-        result = self.livechat_channel._line_push_message(
-            FAKE_LINE_ACCESS_TOKEN, FAKE_LINE_USER_ID,
-            [{'type': 'text', 'text': 'during outage'}],
+        result = self.env['line.api.service'].push_message(
+            FAKE_LINE_USER_ID, [{'type': 'text', 'text': 'during outage'}],
+            access_token=FAKE_LINE_ACCESS_TOKEN,
         )
         self.assertFalse(result)
 
@@ -130,7 +139,7 @@ class TestIncidentResponse(LineTransactionCase):
         self.skipTest('Infrastructure-level test')
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestBackupRestore(LineTransactionCase):
     """Phase 13.4: Backup and restore."""
 
@@ -165,7 +174,7 @@ class TestBackupRestore(LineTransactionCase):
         self.assertIn('restored.example.com', url)
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestCapacityPlanning(LineTransactionCase):
     """Phase 13.5: Capacity planning."""
 

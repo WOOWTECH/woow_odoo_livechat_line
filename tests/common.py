@@ -202,6 +202,21 @@ class LineTestMixin:
             'line_user_id': line_user_id,
         })
 
+    def _bind_line_user(self, partner, line_user_id):
+        """Create (or reuse) a line.user with line_user_id and bind it to
+        partner. res.partner has no line_user_id field of its own anymore —
+        the LINE identity lives on line.user (woow_line_base), related via
+        line.user.partner_id / res.partner.line_user_ids."""
+        LineUser = self.env['line.user'].sudo()
+        line_user = LineUser.search([('line_user_id', '=', line_user_id)], limit=1)
+        if not line_user:
+            line_user = LineUser.create({
+                'line_user_id': line_user_id,
+                'display_name': partner.name,
+            })
+        line_user.bind_partner(partner.id)
+        return line_user
+
     def _create_line_discuss_channel(self, guest,
                                       line_user_id=FAKE_LINE_USER_ID):
         """Create a discuss.channel linked to a LINE user."""
@@ -230,7 +245,9 @@ class LineTestMixin:
         signature = make_line_signature(body_str, channel_secret)
 
         mock_httprequest = MagicMock()
-        mock_httprequest.get_data.return_value = body_str
+        # The real Werkzeug get_data() returns bytes; verify_webhook_signature
+        # hashes it directly and errors on a str.
+        mock_httprequest.get_data.return_value = body_str.encode('utf-8')
         mock_httprequest.headers = {
             'X-Line-Signature': signature,
             'Content-Type': 'application/json',

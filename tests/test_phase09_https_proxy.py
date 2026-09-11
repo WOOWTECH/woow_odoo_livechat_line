@@ -12,7 +12,7 @@ from odoo.tests import tagged
 from .common import LineTransactionCase
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestTLSConfiguration(LineTransactionCase):
     """Phase 9.1: TLS configuration."""
 
@@ -34,7 +34,7 @@ class TestTLSConfiguration(LineTransactionCase):
         self.skipTest('Infrastructure-level test; manual verification required')
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestReverseProxyHeaders(LineTransactionCase):
     """Phase 9.2: Reverse proxy headers."""
 
@@ -59,7 +59,7 @@ class TestReverseProxyHeaders(LineTransactionCase):
         self.skipTest('Configuration documentation test; manual verification')
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestAttachmentURLAccessibility(LineTransactionCase):
     """Phase 9.3: Attachment URL accessibility."""
 

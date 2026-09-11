@@ -18,7 +18,7 @@ from .common import (
 )
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestFreshInstallation(LineTransactionCase):
     """Phase 6.1: Fresh installation verification."""
 
@@ -49,25 +49,25 @@ class TestFreshInstallation(LineTransactionCase):
         self.assertIn('line_channel_secret', lc_f)
         self.assertIn('line_webhook_url', lc_f)
 
-        # res.partner
+        # res.partner: the LINE identity is a weak relation to line.user
+        # (woow_line_base), not a direct char field, since the refactor.
         rp_f = self.env['res.partner']._fields
-        self.assertIn('line_user_id', rp_f)
+        self.assertIn('line_user_ids', rp_f)
 
     def test_6_1_3_xml_views_loaded(self):
-        """XML views for LiveChat channel and partner form loaded."""
+        """XML view for LiveChat channel loaded.
+
+        The old assertion also expected a res.partner form field for
+        line_user_id; that LINE tab was deliberately removed in favour of a
+        smart button (see woow_line_base/views/res_partner_views.xml), so
+        there is no such view content to guard anymore.
+        """
         # LiveChat channel form inherit
         views = self.env['ir.ui.view'].search([
             ('model', '=', 'im_livechat.channel'),
             ('type', '=', 'form'),
         ])
         self.assertTrue(views, 'LiveChat channel form view should exist')
-
-        # Partner form inherit
-        partner_views = self.env['ir.ui.view'].search([
-            ('model', '=', 'res.partner'),
-            ('arch_db', 'like', 'line_user_id'),
-        ])
-        self.assertTrue(partner_views, 'Partner form should have LINE field')
 
     def test_6_1_4_static_asset_path_referenced(self):
         """video_preview.png path is used in discuss_channel.py."""
@@ -93,7 +93,7 @@ class TestFreshInstallation(LineTransactionCase):
         self.assertTrue(callable(getattr(LineWebhookController, 'line_webhook')))
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestUpgrade(LineTransactionCase):
     """Phase 6.2: Upgrade from previous version."""
 
@@ -108,22 +108,23 @@ class TestUpgrade(LineTransactionCase):
         self.assertEqual(channel_r.line_user_id, FAKE_LINE_USER_ID)
 
     def test_6_2_2_partner_line_user_id_field_exists(self):
-        """res.partner.line_user_id column added (NULL for existing)."""
+        """res.partner has no LINE binding until one is created (the LINE
+        identity is a line_user_ids relation now, not a bare column)."""
         partner = self.env['res.partner'].create({'name': 'Existing Partner'})
-        self.assertFalse(partner.line_user_id)
+        self.assertFalse(partner.line_user_ids)
 
     def test_6_2_3_sql_unique_constraints(self):
-        """Unique constraints on mail.guest and res.partner line_user_id."""
+        """Unique constraints on mail.guest and line.user line_user_id."""
         self._create_line_guest(line_user_id='U_uniq_test_001')
         with self.assertRaises(Exception):
             self._create_line_guest(line_user_id='U_uniq_test_001')
 
-        self.env['res.partner'].create({
-            'name': 'P1', 'line_user_id': 'U_uniq_partner_001',
+        self.env['line.user'].create({
+            'line_user_id': 'U_uniq_partner_001', 'display_name': 'P1',
         })
         with self.assertRaises(Exception):
-            self.env['res.partner'].create({
-                'name': 'P2', 'line_user_id': 'U_uniq_partner_001',
+            self.env['line.user'].create({
+                'line_user_id': 'U_uniq_partner_001', 'display_name': 'P2',
             })
 
     def test_6_2_4_legacy_guest_triggers_partner_creation(self):
@@ -137,7 +138,7 @@ class TestUpgrade(LineTransactionCase):
         # (tested in Phase 7)
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestConfigValidation(LineTransactionCase):
     """Phase 6.3: Configuration validation."""
 
@@ -176,7 +177,7 @@ class TestConfigValidation(LineTransactionCase):
             })
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestContactBindingOnDeploy(LineTransactionCase):
     """Phase 6.4: Contact binding on deploy."""
 
@@ -187,13 +188,14 @@ class TestContactBindingOnDeploy(LineTransactionCase):
         self.assertEqual(guest.line_user_id, FAKE_LINE_USER_ID)
 
     def test_6_4_2_partner_form_has_line_field(self):
-        """Partner form includes line_user_id field."""
-        self.assertIn('line_user_id', self.env['res.partner']._fields)
-        field = self.env['res.partner']._fields['line_user_id']
-        self.assertEqual(field.type, 'char')
+        """res.partner exposes its LINE binding as a one2many to line.user,
+        not a raw char column (guards against regressing to the old design)."""
+        self.assertIn('line_user_ids', self.env['res.partner']._fields)
+        field = self.env['res.partner']._fields['line_user_ids']
+        self.assertEqual(field.type, 'one2many')
 
     def test_6_4_3_manual_partner_binding_wizard(self):
-        """Wizard links guest to existing partner and syncs LINE ID."""
+        """Wizard links guest to existing partner and binds a line.user."""
         guest = self._create_line_guest()
         partner = self.env['res.partner'].create({'name': 'Real Customer'})
         wizard = self.env['line.guest.link.partner.wizard'].create({
@@ -203,15 +205,16 @@ class TestContactBindingOnDeploy(LineTransactionCase):
         wizard.action_link()
         self.assertEqual(guest.line_partner_id, partner)
         self.assertEqual(guest.name, partner.name)
-        # Wizard syncs line_user_id to partner
-        self.assertEqual(partner.line_user_id, FAKE_LINE_USER_ID)
+        # Wizard binds a line.user carrying the LINE id to the partner
+        self.assertIn(FAKE_LINE_USER_ID, partner.line_user_ids.mapped('line_user_id'))
 
     def test_6_4_4_duplicate_partner_line_user_id_blocked(self):
-        """Unique constraint prevents two partners with same LINE ID."""
-        self.env['res.partner'].create({
-            'name': 'P1', 'line_user_id': 'U_dup_test_001',
+        """Unique constraint prevents two line.user records with same LINE
+        ID (the identity now lives on line.user, not res.partner)."""
+        self.env['line.user'].create({
+            'line_user_id': 'U_dup_test_001', 'display_name': 'P1',
         })
         with self.assertRaises(Exception):
-            self.env['res.partner'].create({
-                'name': 'P2', 'line_user_id': 'U_dup_test_001',
+            self.env['line.user'].create({
+                'line_user_id': 'U_dup_test_001', 'display_name': 'P2',
             })

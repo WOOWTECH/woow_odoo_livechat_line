@@ -10,13 +10,10 @@ from unittest.mock import patch
 from odoo.tests import tagged
 
 from .common import (
-    FAKE_LINE_ACCESS_TOKEN,
     FAKE_LINE_CHANNEL_ID,
     FAKE_LINE_CHANNEL_SECRET,
     FAKE_LINE_USER_ID,
     LineTransactionCase,
-    make_line_signature,
-    make_webhook_body,
     make_webhook_event,
     mock_line_token_response,
     route_mock_get,
@@ -26,11 +23,11 @@ from .common import (
 SECOND_CHANNEL_ID = '9876543210'
 SECOND_CHANNEL_SECRET = 'second_channel_secret_32chars_lo'
 
-MOCK_POST = 'odoo.addons.woow_odoo_livechat_line.models.line_api.requests.post'
-MOCK_GET = 'odoo.addons.woow_odoo_livechat_line.models.line_api.requests.get'
+MOCK_POST = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.post'
+MOCK_GET = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.get'
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestMultipleLineAccounts(LineTransactionCase):
     """Phase 8.1: Multiple LINE Official Accounts."""
 
@@ -55,43 +52,56 @@ class TestMultipleLineAccounts(LineTransactionCase):
             self.livechat_channel_2.line_channel_secret,
         )
 
-    def test_8_1_2_webhook_routes_to_correct_channel(self):
-        """Signature valid for one channel is invalid for other."""
-        from odoo.addons.woow_odoo_livechat_line.controllers.webhook import (
-            LineWebhookController,
-        )
-        controller = LineWebhookController()
-        body = make_webhook_body([make_webhook_event()])
-        sig_ch1 = make_line_signature(body, FAKE_LINE_CHANNEL_SECRET)
-        sig_ch2 = make_line_signature(body, SECOND_CHANNEL_SECRET)
+    @patch(MOCK_GET, side_effect=route_mock_get)
+    @patch(MOCK_POST, side_effect=route_mock_post)
+    def test_8_1_2_webhook_routes_to_correct_channel(self, mock_post, mock_get):
+        """A body signed for one channel's secret is rejected when
+        delivered to a different channel (whose secret differs), and
+        accepted when delivered to its own channel.
 
+        The old test called the controller's private _verify_signature
+        directly; signature verification now lives in the shared
+        line.api.service and there is no public per-body verify hook on the
+        controller, so this drives the real seam (the webhook route itself)
+        and observes the effect through what a valid/invalid delivery
+        actually does: create (or not) the resulting guest.
+        """
+        uid_ok = 'Uwebhookrouteok0000000000000000'
+        self._call_controller_directly(
+            self.livechat_channel.id, [make_webhook_event(line_user_id=uid_ok)],
+            channel_secret=FAKE_LINE_CHANNEL_SECRET,
+        )
         self.assertTrue(
-            controller._verify_signature(body, sig_ch1, FAKE_LINE_CHANNEL_SECRET),
+            self.env['mail.guest'].sudo().search([('line_user_id', '=', uid_ok)]),
+            "a body signed with channel 1's own secret must be accepted by channel 1",
+        )
+
+        uid_bad = 'Uwebhookroutebad000000000000000'
+        self._call_controller_directly(
+            self.livechat_channel_2.id, [make_webhook_event(line_user_id=uid_bad)],
+            channel_secret=FAKE_LINE_CHANNEL_SECRET,  # signed for channel 1, not channel 2
         )
         self.assertFalse(
-            controller._verify_signature(body, sig_ch1, SECOND_CHANNEL_SECRET),
-        )
-        self.assertTrue(
-            controller._verify_signature(body, sig_ch2, SECOND_CHANNEL_SECRET),
+            self.env['mail.guest'].sudo().search([('line_user_id', '=', uid_bad)]),
+            "a body signed with channel 1's secret must be rejected by channel 2",
         )
 
     @patch(MOCK_POST)
     def test_8_1_3_token_cache_isolation(self, mock_post):
-        """Token cache keyed by channel_id; no cross-contamination."""
-        from odoo.addons.woow_odoo_livechat_line.models import line_api
-        line_api._token_cache.clear()
+        """Fetching an access token for one channel does not satisfy the
+        cache for a different channel — each channel/secret pair fetches
+        its own OAuth token via the shared line.api.service."""
         mock_post.return_value = mock_line_token_response()
+        api = self.env['line.api.service']
 
-        self.livechat_channel._line_get_access_token(
-            FAKE_LINE_CHANNEL_ID, FAKE_LINE_CHANNEL_SECRET,
-        )
-        self.assertIn(FAKE_LINE_CHANNEL_ID, line_api._token_cache)
-        self.assertNotIn(SECOND_CHANNEL_ID, line_api._token_cache)
+        token1 = api.get_access_token(FAKE_LINE_CHANNEL_ID, FAKE_LINE_CHANNEL_SECRET)
+        token2 = api.get_access_token(SECOND_CHANNEL_ID, SECOND_CHANNEL_SECRET)
 
-        self.livechat_channel_2._line_get_access_token(
-            SECOND_CHANNEL_ID, SECOND_CHANNEL_SECRET,
-        )
-        self.assertIn(SECOND_CHANNEL_ID, line_api._token_cache)
+        self.assertTrue(token1)
+        self.assertTrue(token2)
+        self.assertEqual(
+            mock_post.call_count, 2,
+            "each channel must fetch its own OAuth token, not reuse the other's cache")
 
     def test_8_1_4_same_user_two_accounts(self):
         """Same LINE user messaging two OA creates two channels."""
@@ -115,7 +125,7 @@ class TestMultipleLineAccounts(LineTransactionCase):
         )
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestMultiCompany(LineTransactionCase):
     """Phase 8.2: Multi-company."""
 
@@ -142,15 +152,15 @@ class TestMultiCompany(LineTransactionCase):
         self.assertTrue(True)
 
     def test_8_2_3_partner_company_rules(self):
-        """Partner with line_user_id respects company rules."""
-        partner = self.env['res.partner'].create({
-            'name': 'Line Partner',
-            'line_user_id': 'U_company_test',
-        })
+        """Partner with a bound LINE identity is created normally; standard
+        Odoo company rules apply to it like any other partner."""
+        partner = self.env['res.partner'].create({'name': 'Line Partner'})
+        self._bind_line_user(partner, 'U_company_test')
         self.assertTrue(partner.exists())
+        self.assertIn('U_company_test', partner.line_user_ids.mapped('line_user_id'))
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestMultiDatabase(LineTransactionCase):
     """Phase 8.3: Multi-database (SaaS)."""
 
@@ -163,13 +173,16 @@ class TestMultiDatabase(LineTransactionCase):
         url = self.livechat_channel.line_webhook_url
         self.assertIn('/line/webhook/', url)
 
-    def test_8_3_3_token_cache_per_process(self):
-        """Token cache is per-process in-memory dict."""
-        from odoo.addons.woow_odoo_livechat_line.models import line_api
-        self.assertIsInstance(line_api._token_cache, dict)
+    # test_8_3_3_token_cache_per_process deleted: it asserted the internal
+    # type of a module-private cache dict in a module
+    # (woow_odoo_livechat_line.models.line_api) that no longer exists — token
+    # caching moved to the shared woow_line_base.models.line_api_service.
+    # The real behaviour it was gesturing at (repeated token fetches for the
+    # same channel don't hit the network every time) is covered by
+    # test_8_4_4_token_refresh_cached below via the public get_access_token
+    # seam, so there's nothing left here worth rewriting.
 
-
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestConcurrentLoad(LineTransactionCase):
     """Phase 8.4: Concurrent load."""
 
@@ -201,13 +214,10 @@ class TestConcurrentLoad(LineTransactionCase):
 
     @patch(MOCK_POST)
     def test_8_4_4_token_refresh_cached(self, mock_post):
-        """Repeated token requests use cache (single HTTP call)."""
-        from odoo.addons.woow_odoo_livechat_line.models import line_api
-        line_api._token_cache.clear()
+        """Repeated token requests use the cache (single HTTP call)."""
         mock_post.return_value = mock_line_token_response()
+        api = self.env['line.api.service']
 
         for _ in range(5):
-            self.livechat_channel._line_get_access_token(
-                FAKE_LINE_CHANNEL_ID, FAKE_LINE_CHANNEL_SECRET,
-            )
+            api.get_access_token(FAKE_LINE_CHANNEL_ID, FAKE_LINE_CHANNEL_SECRET)
         self.assertEqual(mock_post.call_count, 1)
