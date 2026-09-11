@@ -27,7 +27,7 @@ MOCK_POST = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.po
 MOCK_GET = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.get'
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestMultipleLineAccounts(LineTransactionCase):
     """Phase 8.1: Multiple LINE Official Accounts."""
 
@@ -125,7 +125,7 @@ class TestMultipleLineAccounts(LineTransactionCase):
         )
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestMultiCompany(LineTransactionCase):
     """Phase 8.2: Multi-company."""
 
@@ -160,7 +160,7 @@ class TestMultiCompany(LineTransactionCase):
         self.assertIn('U_company_test', partner.line_user_ids.mapped('line_user_id'))
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestMultiDatabase(LineTransactionCase):
     """Phase 8.3: Multi-database (SaaS)."""
 
@@ -182,7 +182,7 @@ class TestMultiDatabase(LineTransactionCase):
     # test_8_4_4_token_refresh_cached below via the public get_access_token
     # seam, so there's nothing left here worth rewriting.
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestConcurrentLoad(LineTransactionCase):
     """Phase 8.4: Concurrent load."""
 

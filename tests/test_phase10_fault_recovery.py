@@ -21,7 +21,7 @@ MOCK_POST = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.po
 MOCK_GET = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.get'
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestContainerLifecycle(LineTransactionCase):
     """Phase 10.1: Container lifecycle."""
 
@@ -48,7 +48,7 @@ class TestContainerLifecycle(LineTransactionCase):
         self.skipTest('Infrastructure-level test; volume config')
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestDatabaseResilience(LineTransactionCase):
     """Phase 10.2: Database resilience."""
 
@@ -70,7 +70,7 @@ class TestDatabaseResilience(LineTransactionCase):
         self.skipTest('Infrastructure-level test; PostgreSQL WAL config')
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestExternalServiceFailures(LineTransactionCase):
     """Phase 10.3: External service failures.
 
@@ -130,7 +130,7 @@ class TestExternalServiceFailures(LineTransactionCase):
         self.assertEqual(profile, {})
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestDataIntegrity(LineTransactionCase):
     """Phase 10.4: Data integrity."""
 

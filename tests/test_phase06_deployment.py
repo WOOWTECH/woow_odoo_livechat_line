@@ -18,7 +18,7 @@ from .common import (
 )
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestFreshInstallation(LineTransactionCase):
     """Phase 6.1: Fresh installation verification."""
 
@@ -93,7 +93,7 @@ class TestFreshInstallation(LineTransactionCase):
         self.assertTrue(callable(getattr(LineWebhookController, 'line_webhook')))
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestUpgrade(LineTransactionCase):
     """Phase 6.2: Upgrade from previous version."""
 
@@ -138,7 +138,7 @@ class TestUpgrade(LineTransactionCase):
         # (tested in Phase 7)
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestConfigValidation(LineTransactionCase):
     """Phase 6.3: Configuration validation."""
 
@@ -177,7 +177,7 @@ class TestConfigValidation(LineTransactionCase):
             })
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestContactBindingOnDeploy(LineTransactionCase):
     """Phase 6.4: Contact binding on deploy."""
 

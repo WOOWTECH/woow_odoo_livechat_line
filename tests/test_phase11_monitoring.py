@@ -25,7 +25,7 @@ MOCK_POST = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.po
 MOCK_GET = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.get'
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestApplicationMetrics(LineTransactionCase):
     """Phase 11.1: Application metrics."""
 
@@ -122,7 +122,7 @@ class TestApplicationMetrics(LineTransactionCase):
         self.assertNotIn(FAKE_LINE_CHANNEL_ID, log_text)
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestInfrastructureMonitoring(LineTransactionCase):
     """Phase 11.2: Infrastructure monitoring."""
 
@@ -143,7 +143,7 @@ class TestInfrastructureMonitoring(LineTransactionCase):
         self.skipTest('Infrastructure monitoring test')
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestAlertingRules(LineTransactionCase):
     """Phase 11.3: Alerting rules."""
 

@@ -22,7 +22,7 @@ from .common import (
 MOCK_POST = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.post'
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestPersonalDataInventory(LineTransactionCase):
     """Phase 12.1: Personal data inventory."""
 
@@ -54,7 +54,7 @@ class TestPersonalDataInventory(LineTransactionCase):
         self.assertEqual(field.type, 'char')
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestDataRetention(LineTransactionCase):
     """Phase 12.2: Data retention and deletion."""
 
@@ -109,7 +109,7 @@ class TestDataRetention(LineTransactionCase):
         self.assertTrue(len(channels) >= 1)
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestConsentTransparency(LineTransactionCase):
     """Phase 12.3: Consent and transparency."""
 
@@ -148,7 +148,7 @@ class TestConsentTransparency(LineTransactionCase):
         self.assertIn('unfollow', log_text.lower())
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestAccessControl(LineTransactionCase):
     """Phase 12.4: Access control."""
 
@@ -181,7 +181,7 @@ class TestAccessControl(LineTransactionCase):
         self.assertTrue(len(att1.access_token) >= 20)
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestAuditTrail(LineTransactionCase):
     """Phase 12.5: Audit trail."""
 

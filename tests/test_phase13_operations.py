@@ -24,7 +24,7 @@ from .common import (
 MOCK_POST = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.post'
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestModuleUpgrade(LineTransactionCase):
     """Phase 13.1: Module upgrade and migration."""
 
@@ -56,7 +56,7 @@ class TestModuleUpgrade(LineTransactionCase):
         self.assertTrue(module.installed_version.startswith('18.0'))
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestLineAccountLifecycle(LineTransactionCase):
     """Phase 13.2: LINE account lifecycle."""
 
@@ -112,7 +112,7 @@ class TestLineAccountLifecycle(LineTransactionCase):
         self.assertIn('new-domain.example.com', url)
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestIncidentResponse(LineTransactionCase):
     """Phase 13.3: Incident response."""
 
@@ -139,7 +139,7 @@ class TestIncidentResponse(LineTransactionCase):
         self.skipTest('Infrastructure-level test')
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestBackupRestore(LineTransactionCase):
     """Phase 13.4: Backup and restore."""
 
@@ -174,7 +174,7 @@ class TestBackupRestore(LineTransactionCase):
         self.assertIn('restored.example.com', url)
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestCapacityPlanning(LineTransactionCase):
     """Phase 13.5: Capacity planning."""
 

@@ -28,7 +28,7 @@ MOCK_POST = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.po
 MOCK_GET = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.get'
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestProfileAPI(LineTransactionCase):
     """Phase 7.1: LINE Profile API integration."""
 
@@ -144,7 +144,7 @@ class TestProfileAPI(LineTransactionCase):
         self.assertTrue(guest.exists())
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestAutoPartnerCreation(LineTransactionCase):
     """Phase 7.2: Auto partner creation."""
 
@@ -205,7 +205,7 @@ class TestAutoPartnerCreation(LineTransactionCase):
         self.assertIn(uid, guest.line_partner_id.line_user_ids.mapped('line_user_id'))
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestManualBindingWizard(LineTransactionCase):
     """Phase 7.3: Manual binding wizard."""
 
@@ -257,7 +257,7 @@ class TestManualBindingWizard(LineTransactionCase):
         self.assertFalse(guest.line_partner_id)
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestContactEdgeCases(LineTransactionCase):
     """Phase 7.4: Edge cases."""
 
