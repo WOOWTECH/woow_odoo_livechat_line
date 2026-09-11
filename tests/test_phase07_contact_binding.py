@@ -24,8 +24,8 @@ from .common import (
     route_mock_post,
 )
 
-MOCK_POST = 'odoo.addons.woow_odoo_livechat_line.models.line_api.requests.post'
-MOCK_GET = 'odoo.addons.woow_odoo_livechat_line.models.line_api.requests.get'
+MOCK_POST = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.post'
+MOCK_GET = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.get'
 
 
 @tagged('post_install', '-at_install')
@@ -74,7 +74,7 @@ class TestProfileAPI(LineTransactionCase):
             [make_webhook_event(line_user_id=uid)],
         )
         partner = self.env['res.partner'].sudo().search([
-            ('line_user_id', '=', uid),
+            ('line_user_ids.line_user_id', '=', uid),
         ])
         self.assertTrue(partner.exists())
         self.assertEqual(partner.name, FAKE_LINE_DISPLAY_NAME)
@@ -86,9 +86,8 @@ class TestProfileAPI(LineTransactionCase):
         uid = 'U' + 'd' * 32
         # Create existing guest with partner (complete record)
         guest = self._create_line_guest(line_user_id=uid, name='Known User')
-        partner = self.env['res.partner'].create({
-            'name': 'Known User', 'line_user_id': uid,
-        })
+        partner = self.env['res.partner'].create({'name': 'Known User'})
+        self._bind_line_user(partner, uid)
         guest.write({'line_partner_id': partner.id})
 
         mock_get.reset_mock()
@@ -159,7 +158,7 @@ class TestAutoPartnerCreation(LineTransactionCase):
             [make_webhook_event(line_user_id=uid)],
         )
         partner = self.env['res.partner'].sudo().search([
-            ('line_user_id', '=', uid),
+            ('line_user_ids.line_user_id', '=', uid),
         ])
         self.assertTrue(partner.exists())
         self.assertEqual(partner.name, FAKE_LINE_DISPLAY_NAME)
@@ -180,13 +179,14 @@ class TestAutoPartnerCreation(LineTransactionCase):
         self.assertTrue(guest.line_partner_id)
 
     def test_7_2_3_partner_line_user_id_unique(self):
-        """Partner line_user_id unique constraint enforced."""
-        self.env['res.partner'].create({
-            'name': 'A', 'line_user_id': 'U_unique_p_001',
+        """line.user.line_user_id unique constraint enforced (the LINE
+        identity lives on line.user, not res.partner, since the refactor)."""
+        self.env['line.user'].create({
+            'line_user_id': 'U_unique_p_001', 'display_name': 'A',
         })
         with self.assertRaises(Exception):
-            self.env['res.partner'].create({
-                'name': 'B', 'line_user_id': 'U_unique_p_001',
+            self.env['line.user'].create({
+                'line_user_id': 'U_unique_p_001', 'display_name': 'B',
             })
 
     @patch(MOCK_GET, side_effect=route_mock_get)
@@ -202,7 +202,7 @@ class TestAutoPartnerCreation(LineTransactionCase):
             ('line_user_id', '=', uid),
         ])
         self.assertTrue(guest.line_partner_id)
-        self.assertEqual(guest.line_partner_id.line_user_id, uid)
+        self.assertIn(uid, guest.line_partner_id.line_user_ids.mapped('line_user_id'))
 
 
 @tagged('post_install', '-at_install')
@@ -230,21 +230,22 @@ class TestManualBindingWizard(LineTransactionCase):
         self.assertEqual(result['type'], 'ir.actions.act_window_close')
         self.assertEqual(guest.line_partner_id, partner)
         self.assertEqual(guest.name, 'Customer A')
-        self.assertEqual(partner.line_user_id, FAKE_LINE_USER_ID)
+        self.assertIn(FAKE_LINE_USER_ID, partner.line_user_ids.mapped('line_user_id'))
 
     def test_7_3_3_link_partner_with_existing_line_id(self):
-        """Wizard does not overwrite existing partner line_user_id."""
+        """Wizard does not overwrite an existing line.user binding with a
+        different LINE identity than the one already bound to the partner."""
         guest = self._create_line_guest()
-        partner = self.env['res.partner'].create({
-            'name': 'Has LINE', 'line_user_id': 'U_existing_id',
-        })
+        partner = self.env['res.partner'].create({'name': 'Has LINE'})
+        self._bind_line_user(partner, 'U_existing_id')
         wizard = self.env['line.guest.link.partner.wizard'].create({
             'guest_id': guest.id,
             'partner_id': partner.id,
         })
         wizard.action_link()
-        # Partner already had a line_user_id; wizard should not overwrite
-        self.assertEqual(partner.line_user_id, 'U_existing_id')
+        # Partner already had a LINE identity; it must still be there
+        # (the guest's own LINE id is bound as an additional line.user).
+        self.assertIn('U_existing_id', partner.line_user_ids.mapped('line_user_id'))
 
     def test_7_3_4_unlink_guest_partner(self):
         """Clearing guest.line_partner_id disconnects the link."""
@@ -266,9 +267,8 @@ class TestContactEdgeCases(LineTransactionCase):
         """Legacy guest with generic name gets updated on next message."""
         uid = 'U' + '4' * 32
         guest = self._create_line_guest(line_user_id=uid, name='LINE User')
-        partner = self.env['res.partner'].create({
-            'name': 'LINE User', 'line_user_id': uid,
-        })
+        partner = self.env['res.partner'].create({'name': 'LINE User'})
+        self._bind_line_user(partner, uid)
         guest.write({'line_partner_id': partner.id})
 
         # Profile returns new name
@@ -298,10 +298,9 @@ class TestContactEdgeCases(LineTransactionCase):
 
     def test_7_4_4_partner_merge_conflict(self):
         """Two partners with different LINE IDs remain distinct."""
-        p1 = self.env['res.partner'].create({
-            'name': 'P1', 'line_user_id': 'U_merge_001',
-        })
-        p2 = self.env['res.partner'].create({
-            'name': 'P2', 'line_user_id': 'U_merge_002',
-        })
-        self.assertNotEqual(p1.line_user_id, p2.line_user_id)
+        p1 = self.env['res.partner'].create({'name': 'P1'})
+        self._bind_line_user(p1, 'U_merge_001')
+        p2 = self.env['res.partner'].create({'name': 'P2'})
+        self._bind_line_user(p2, 'U_merge_002')
+        self.assertNotEqual(
+            p1.line_user_ids.line_user_id, p2.line_user_ids.line_user_id)
