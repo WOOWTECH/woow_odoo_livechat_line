@@ -6,7 +6,7 @@ import logging
 from markupsafe import escape
 
 from odoo import http
-from odoo.http import request
+from odoo.http import request, Response
 
 _logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class LineWebhookController(http.Controller):
 
     @http.route(
         '/line/webhook/<int:channel_id>',
-        type='json',
+        type='http',
         auth='public',
         methods=['POST'],
         csrf=False,
@@ -32,31 +32,37 @@ class LineWebhookController(http.Controller):
             channel_id: The LiveChat channel ID.
 
         Returns:
-            dict: Empty dict on success (LINE expects 200 OK).
+            Response: 200 on success (LINE expects 200 OK). 403 on a bad
+            signature — this used to be a type='json' route, which always
+            answers 200 even on errors, so forged requests and scans were
+            invisible and LINE-Signature checking had no observable effect.
         """
         _logger.info('LINE webhook: Received request for channel_id=%s', channel_id)
 
         livechat_channel = request.env['im_livechat.channel'].sudo().browse(channel_id)
         if not livechat_channel.exists() or not livechat_channel.line_enabled:
             _logger.warning('LINE webhook: Invalid or disabled channel %s', channel_id)
-            return {}
+            return Response('OK', status=200)
 
         # Verify LINE signature using line.api.service
         body = request.httprequest.get_data()
         body_text = body.decode('utf-8') if isinstance(body, bytes) else body
         signature = request.httprequest.headers.get('X-Line-Signature', '')
 
-        _logger.info('LINE webhook: Body length=%s, signature=%s',
-                     len(body_text), signature[:20] if signature else 'None')
+        _logger.info('LINE webhook: Body length=%s', len(body_text))
 
         line_api = request.env['line.api.service'].sudo()
         if not line_api.verify_webhook_signature(
             body, signature,
             channel_secret=livechat_channel.line_channel_secret,
         ):
-            _logger.warning('LINE webhook: Invalid signature for channel %s', channel_id)
-            _logger.warning('LINE webhook: Body=%s', body_text[:200] if body_text else 'None')
-            return {}
+            # The body is attacker-controlled (this is an unauthenticated
+            # endpoint) and must never reach the logs — only ids/sizes do.
+            _logger.warning(
+                'LINE webhook: Invalid signature for channel %s (body length=%s)',
+                channel_id, len(body_text),
+            )
+            return Response('Invalid signature', status=403)
 
         # Process events
         data = json.loads(body_text)
@@ -66,13 +72,14 @@ class LineWebhookController(http.Controller):
 
         for event in events:
             try:
-                _logger.info('LINE webhook: Event type=%s, full_event=%s',
+                _logger.info('LINE webhook: Event type=%s', event.get('type'))
+                _logger.debug('LINE webhook: Event type=%s, full_event=%s',
                             event.get('type'), json.dumps(event)[:500])
                 self._process_event(event, livechat_channel)
             except Exception:
                 _logger.exception('LINE webhook [%s]: Error processing event', channel_id)
 
-        return {}
+        return Response('OK', status=200)
 
     def _process_event(self, event, livechat_channel):
         """Process a single LINE event.
@@ -196,7 +203,9 @@ class LineWebhookController(http.Controller):
                 guest_vals['line_partner_id'] = partner.id
 
             guest = Guest.create(guest_vals)
-            _logger.info('LINE webhook: Created guest %s (name=%s) for LINE user %s',
+            _logger.info('LINE webhook: Created guest %s for LINE user %s',
+                        guest.id, line_user_id)
+            _logger.debug('LINE webhook: Created guest %s (name=%s) for LINE user %s',
                         guest.id, guest_name, line_user_id)
         else:
             # Existing guest - only fetch profile if name is generic or partner missing
@@ -247,7 +256,8 @@ class LineWebhookController(http.Controller):
 
         profile = line_api.get_profile(line_user_id, access_token=access_token)
         if profile:
-            _logger.info('LINE webhook: Fetched profile for %s: displayName=%s',
+            _logger.info('LINE webhook: Fetched profile for %s', line_user_id)
+            _logger.debug('LINE webhook: Fetched profile for %s: displayName=%s',
                         line_user_id, profile.get('displayName', ''))
         return profile or {}
 
@@ -345,7 +355,9 @@ class LineWebhookController(http.Controller):
         attachment_ids = []
         message_id = message.get('id')
 
-        _logger.info('LINE webhook: _create_message called, message_type=%s, message_id=%s, message=%s',
+        _logger.info('LINE webhook: _create_message called, message_type=%s, message_id=%s',
+                    message_type, message_id)
+        _logger.debug('LINE webhook: _create_message called, message_type=%s, message_id=%s, message=%s',
                     message_type, message_id, json.dumps(message)[:300])
         _log_to_file(f'_create_message: type={message_type}, id={message_id}, msg={json.dumps(message)[:300]}')
 
@@ -386,7 +398,9 @@ class LineWebhookController(http.Controller):
             body = f'[Unsupported message type: {message_type}]'
 
         if body or attachment_ids:
-            _logger.info('LINE webhook: Posting message to channel %s, body=%s, has_attachments=%s',
+            _logger.info('LINE webhook: Posting message to channel %s, has_attachments=%s',
+                        discuss_channel.id, bool(attachment_ids))
+            _logger.debug('LINE webhook: Posting message to channel %s, body=%s, has_attachments=%s',
                         discuss_channel.id, body[:50] if body else '', bool(attachment_ids))
             # Use context flag to prevent sending message back to LINE
             # Set guest in context so Odoo's message_post picks up author_guest_id
@@ -443,7 +457,7 @@ class LineWebhookController(http.Controller):
             content = result
             content_type = None
 
-        _logger.info('LINE webhook: Downloaded content, size=%s bytes, content_type=%s',
+        _logger.debug('LINE webhook: Downloaded content, size=%s bytes, content_type=%s',
                     len(content) if content else 0, content_type)
 
         # Determine filename and mimetype from content_type or message_type
@@ -482,7 +496,9 @@ class LineWebhookController(http.Controller):
                 filename = f'line_content_{message_id}'
                 mimetype = 'application/octet-stream'
 
-        _logger.info('LINE webhook: Prepared content filename=%s, mimetype=%s, size=%s',
+        _logger.info('LINE webhook: Prepared content mimetype=%s, size=%s',
+                    mimetype, len(content))
+        _logger.debug('LINE webhook: Prepared content filename=%s, mimetype=%s, size=%s',
                     filename, mimetype, len(content))
         _log_to_file(f'_download_line_content: success filename={filename}, size={len(content)}')
 
