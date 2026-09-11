@@ -21,11 +21,11 @@ from .common import (
     route_mock_post,
 )
 
-MOCK_POST = 'odoo.addons.woow_odoo_livechat_line.models.line_api.requests.post'
-MOCK_GET = 'odoo.addons.woow_odoo_livechat_line.models.line_api.requests.get'
+MOCK_POST = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.post'
+MOCK_GET = 'odoo.addons.woow_line_base.models.line_api_service.http_requests.get'
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestApplicationMetrics(LineTransactionCase):
     """Phase 11.1: Application metrics."""
 
@@ -61,13 +61,20 @@ class TestApplicationMetrics(LineTransactionCase):
 
     @patch(MOCK_POST)
     def test_11_1_3_line_api_call_logged(self, mock_post):
-        """LINE API calls logged with status."""
-        from odoo.addons.woow_odoo_livechat_line.models import line_api
-        line_api._token_cache.clear()
-        mock_post.return_value = mock_line_token_response()
+        """A LINE OAuth token fetch (cache miss) is logged.
+
+        Token fetching moved to the shared woow_line_base
+        line.api.service; im_livechat.channel never had a public
+        _line_get_access_token in this build, and that module's own logger
+        (not a nonexistent models.line_api one) is what actually logs. The
+        old assertion also hardcoded an English phrase that was never the
+        real message (the current log line is Traditional Chinese); assert
+        on the channel id instead, since that's the actually-observable
+        content, not incidental wording.
+        """
         import logging
         logger = logging.getLogger(
-            'odoo.addons.woow_odoo_livechat_line.models.line_api'
+            'odoo.addons.woow_line_base.models.line_api_service'
         )
         captured = []
         handler = logging.Handler()
@@ -76,25 +83,24 @@ class TestApplicationMetrics(LineTransactionCase):
         old_level = logger.level
         logger.setLevel(logging.DEBUG)
         logger.addHandler(handler)
+        mock_post.return_value = mock_line_token_response()
         try:
-            self.livechat_channel._line_get_access_token(
+            self.env['line.api.service'].get_access_token(
                 FAKE_LINE_CHANNEL_ID, FAKE_LINE_CHANNEL_SECRET,
             )
         finally:
             logger.removeHandler(handler)
             logger.setLevel(old_level)
         log_text = '\n'.join(r.getMessage() for r in captured)
-        self.assertIn('token refreshed', log_text.lower())
+        self.assertIn(FAKE_LINE_CHANNEL_ID, log_text)
 
     @patch(MOCK_POST)
     def test_11_1_4_token_refresh_logged(self, mock_post):
-        """Token cache miss triggers logged refresh."""
-        from odoo.addons.woow_odoo_livechat_line.models import line_api
-        line_api._token_cache.clear()
-        mock_post.return_value = mock_line_token_response()
+        """A cache HIT does not re-log a token refresh (only the miss
+        that actually talks to LINE does, per test_11_1_3)."""
         import logging
         logger = logging.getLogger(
-            'odoo.addons.woow_odoo_livechat_line.models.line_api'
+            'odoo.addons.woow_line_base.models.line_api_service'
         )
         captured = []
         handler = logging.Handler()
@@ -103,18 +109,20 @@ class TestApplicationMetrics(LineTransactionCase):
         old_level = logger.level
         logger.setLevel(logging.DEBUG)
         logger.addHandler(handler)
+        mock_post.return_value = mock_line_token_response()
         try:
-            self.livechat_channel._line_get_access_token(
-                FAKE_LINE_CHANNEL_ID, FAKE_LINE_CHANNEL_SECRET,
-            )
+            api = self.env['line.api.service']
+            api.get_access_token(FAKE_LINE_CHANNEL_ID, FAKE_LINE_CHANNEL_SECRET)
+            captured.clear()
+            api.get_access_token(FAKE_LINE_CHANNEL_ID, FAKE_LINE_CHANNEL_SECRET)
         finally:
             logger.removeHandler(handler)
             logger.setLevel(old_level)
         log_text = '\n'.join(r.getMessage() for r in captured)
-        self.assertIn('Access token refreshed', log_text)
+        self.assertNotIn(FAKE_LINE_CHANNEL_ID, log_text)
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestInfrastructureMonitoring(LineTransactionCase):
     """Phase 11.2: Infrastructure monitoring."""
 
@@ -135,7 +143,7 @@ class TestInfrastructureMonitoring(LineTransactionCase):
         self.skipTest('Infrastructure monitoring test')
 
 
-@tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install', 'line_ci')
 class TestAlertingRules(LineTransactionCase):
     """Phase 11.3: Alerting rules."""
 
