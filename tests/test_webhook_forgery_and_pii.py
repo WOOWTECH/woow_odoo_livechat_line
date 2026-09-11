@@ -59,6 +59,19 @@ class _LineWebhookHttpCase(HttpCase, LineTestMixin):
     def _url(self):
         return f'/line/webhook/{self.livechat_channel.id}'
 
+    def _liff_installed(self):
+        # Woow_odoo_line_liff declares the same route pattern
+        # (/line/webhook/<int:...>) and, when installed, is the controller
+        # that actually answers it — it has its own (already-safe)
+        # signature check and 403 response, and only *forwards* the event
+        # to this module's _process_event for business logic. So this
+        # module's own signature-rejection path (and its own warning log)
+        # is only reachable when liff is not installed. See Marlin's brief
+        # "Routing, before you start".
+        return bool(self.env['ir.module.module'].sudo().search_count([
+            ('name', '=', 'woow_odoo_line_liff'), ('state', '=', 'installed'),
+        ]))
+
 
 @tagged('post_install', '-at_install', 'line_ci')
 class TestForgedWebhookRequest(_LineWebhookHttpCase):
@@ -78,6 +91,12 @@ class TestForgedWebhookRequest(_LineWebhookHttpCase):
             'today it is indistinguishable from a real, accepted webhook call')
 
     def test_bad_signature_does_not_write_the_body_to_the_log(self):
+        if self._liff_installed():
+            self.skipTest(
+                'liff answers this route and forwards only successfully-'
+                'verified events to this module; this module\'s own '
+                'signature-rejection path (and its log line) is not '
+                'reachable in this state — see brief\'s "Routing" note')
         # Built by hand (not make_webhook_body/make_webhook_event) to keep
         # the marker within the first 200 chars of the JSON — the exact
         # slice the vulnerable code logs — so this test actually exercises
