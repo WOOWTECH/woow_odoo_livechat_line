@@ -157,6 +157,11 @@ class LineWebhookController(http.Controller):
             _logger.error('LINE webhook: Failed to create discuss channel for user %s', line_user_id)
             return
 
+        message_id = message.get('id')
+        if message_id and not discuss_channel._line_try_claim_message(message_id):
+            _logger.info('LINE webhook: Duplicate message id=%s ignored (redelivery)', message_id)
+            return
+
         # Process message based on type
         self._create_message(message, message_type, discuss_channel, guest, livechat_channel)
 
