@@ -1,6 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import html
+import json
 import logging
 import re
 
@@ -36,6 +37,57 @@ class DiscussChannel(models.Model):
         string='LINE Picture URL',
         help='Profile picture URL from LINE.',
     )
+    line_processed_message_ids = fields.Text(
+        default='[]',
+        help='JSON list of recently processed LINE message.id values for '
+             'this conversation, most-recent last. Used to make webhook '
+             'redelivery idempotent — see _line_try_claim_message.',
+    )
+
+    # Bounded so this column does not grow forever on a long-lived
+    # conversation; LINE redelivers shortly after the original attempt, so
+    # remembering this many recent ids is far more than redelivery needs.
+    _LINE_PROCESSED_IDS_LIMIT = 200
+
+    def _line_try_claim_message(self, line_message_id):
+        """Atomically check whether `line_message_id` was already processed
+        for this channel, and if not, record it.
+
+        LINE redelivers webhook events on network hiccups (and via the
+        "Webhook redelivery" console toggle) using the same message.id. A
+        plain read-then-write dedup check races: two concurrent deliveries
+        of the same event can both read "not seen yet" before either
+        writes, and both go on to create a message. Locking this channel's
+        row with SELECT ... FOR UPDATE serializes concurrent calls: the
+        second call blocks until the first transaction's write commits,
+        then correctly observes the id as already claimed.
+
+        Args:
+            line_message_id: str, LINE's message.id for this event.
+
+        Returns:
+            bool: True if this call claimed the id (caller should process
+            the message), False if it was already processed (caller
+            should skip it — this is a redelivery).
+        """
+        self.ensure_one()
+        self.env.cr.execute(
+            'SELECT line_processed_message_ids FROM discuss_channel '
+            'WHERE id = %s FOR UPDATE',
+            (self.id,),
+        )
+        row = self.env.cr.fetchone()
+        raw = row[0] if row else None
+        processed = json.loads(raw) if raw else []
+        if line_message_id in processed:
+            return False
+        processed.append(line_message_id)
+        processed = processed[-self._LINE_PROCESSED_IDS_LIMIT:]
+        self.env.cr.execute(
+            'UPDATE discuss_channel SET line_processed_message_ids = %s WHERE id = %s',
+            (json.dumps(processed), self.id),
+        )
+        return True
 
     def _post_line_delivery_failure(self, reason):
         """Post a visible warning in the channel when a reply failed to reach LINE.
