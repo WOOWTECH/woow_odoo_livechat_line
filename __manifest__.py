@@ -1,6 +1,6 @@
 {
     'name': 'LiveChat LINE Integration',
-    'version': '18.0.2.0.2',
+    'version': '18.0.2.0.3',
     'category': 'Website/Live Chat',
     'summary': 'Integrate LINE Messaging API with Odoo LiveChat',
     'description': """

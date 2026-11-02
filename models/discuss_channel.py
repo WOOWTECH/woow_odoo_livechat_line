@@ -1,24 +1,13 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import html
 import json
 import logging
-import re
 
 from odoo import api, fields, models
 
+from ..tools.line_text import html_to_line_text, split_line_text
+
 _logger = logging.getLogger(__name__)
-
-# Block-level closing tags that should become a line break instead of just
-# vanishing, so multi-line templates (e.g. appointment reminders) don't get
-# smashed into one run-on line when converted to LINE plain text.
-_BLOCK_CLOSE_RE = re.compile(r'</(?:p|div|li|ul|ol|h[1-6]|tr|table|blockquote|section|article)\s*>',
-                              re.IGNORECASE)
-_LI_OPEN_RE = re.compile(r'<li[^>]*>', re.IGNORECASE)
-_BR_RE = re.compile(r'<br\s*/?>', re.IGNORECASE)
-_TAG_RE = re.compile(r'<[^>]+>')
-_MULTI_BLANK_RE = re.compile(r'\n{3,}')
-
 
 class DiscussChannel(models.Model):
     """Extend Discuss channel to add LINE user association."""
@@ -150,8 +139,10 @@ class DiscussChannel(models.Model):
         # Process text content
         body = message.body or ''
         text = self._line_html_to_text(body)
-        if text:
-            messages.append(line_api.build_text_message(text))
+        # LINE rejects a text message over 5,000 characters: send long
+        # replies as several messages (pushed 5 per request below).
+        for chunk in split_line_text(text):
+            messages.append(line_api.build_text_message(chunk))
 
         # Get base URL for attachments
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
@@ -248,33 +239,20 @@ class DiscussChannel(models.Model):
                     )
 
     def _line_html_to_text(self, body):
-        """Convert a mail.message HTML body into LINE-friendly plain text.
+        """Convert a mail.message HTML body into LINE plain text.
 
-        A naive tag-strip (the previous implementation) drops block
-        boundaries entirely, so e.g. `<div>A<br/>B</div>` becomes "AB" and
-        multi-line templates like appointment reminders collapse into one
-        unreadable run-on line. This converts block-ending tags and <br>
-        into real newlines first, turns <li> into a bullet, THEN strips
-        the remaining tags and unescapes HTML entities (so "A &amp; B"
-        becomes "A & B" instead of staying escaped).
+        See tools/line_text.py: line breaks for <br> and blocks, list
+        bullets/numbers, one line per table row (cells joined by "｜"),
+        external link addresses kept next to their text, entities
+        unescaped once.
 
         Args:
             body: str, HTML body from mail.message.
 
         Returns:
-            str: plain text with real line breaks, suitable for a LINE
-            text message.
+            str: plain text suitable for a LINE text message.
         """
-        if not body:
-            return ''
-        text = _BR_RE.sub('\n', body)
-        text = _LI_OPEN_RE.sub('• ', text)
-        text = _BLOCK_CLOSE_RE.sub('\n', text)
-        text = _TAG_RE.sub('', text)
-        text = html.unescape(text)
-        text = '\n'.join(line.strip() for line in text.split('\n'))
-        text = _MULTI_BLANK_RE.sub('\n\n', text)
-        return text.strip()
+        return html_to_line_text(body)
 
     def _ensure_https_url(self, url):
         """Ensure URL uses HTTPS protocol.
