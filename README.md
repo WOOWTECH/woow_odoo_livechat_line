@@ -842,6 +842,16 @@ To support a new LINE message type (e.g., `imagemap`, `template`, `flex`):
 
 ---
 
+## Outbound Text Formatting
+
+LINE text messages cannot carry HTML, so `_line_html_to_text` (pure helper in `tools/line_text.py`) converts the message body before it is pushed:
+
+- `<br>` and block ends become line breaks; list items start with `• ` (`– ` nested, `1. ` in ordered lists).
+- External http(s) links keep their address as `text URL` (spaces around the URL so LINE auto-links it); a link whose text already is the address is not repeated; relative links and @mentions keep only their text.
+- Tables become one line per row with cells joined by `｜` (body rows start with `・`); link addresses inside a row follow on their own lines.
+- Entities are unescaped exactly once; `<script>`/`<style>` content is dropped.
+- Text longer than LINE's 5,000-character limit is split into several messages (18.0.2.0.3).
+
 ## Webhook Route Conflict with woow_odoo_line_liff
 
 When **both** modules are installed, the bridge module (`woow_odoo_line_liff`) takes precedence for the `/line/webhook/<int:config_id>` route due to Odoo's route registration order.

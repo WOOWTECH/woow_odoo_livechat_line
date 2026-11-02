@@ -13,3 +13,4 @@ from . import test_attachment_outbound
 from . import test_webhook_forgery_and_pii
 from . import test_webhook_redelivery_dedup
 from . import test_operator_reply_roundtrip
+from . import test_line_text
