@@ -3,7 +3,8 @@
 import json
 import logging
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import AccessError
 
 from ..tools.line_text import html_to_line_text, split_line_text
 
@@ -32,6 +33,33 @@ class DiscussChannel(models.Model):
              'this conversation, most-recent last. Used to make webhook '
              'redelivery idempotent — see _line_try_claim_message.',
     )
+
+    # The fields that make a channel "a LINE conversation". Whoever can set
+    # them can make Odoo push messages to any LINE user id through the
+    # official account (see _notify_line_user, which uses sudo() for the
+    # credentials). Core gives every internal user create/write on
+    # discuss.channel, so only trusted code (sudo, e.g. the webhook) and
+    # Live Chat managers may set them.
+    _LINE_PROTECTED_FIELDS = frozenset((
+        'line_user_id', 'line_display_name', 'line_picture_url',
+        'line_processed_message_ids',
+    ))
+
+    def _line_check_protected_fields(self, vals_list):
+        if self.env.su or self.env.user.has_group('im_livechat.im_livechat_group_manager'):
+            return
+        for vals in vals_list:
+            if self._LINE_PROTECTED_FIELDS & set(vals):
+                raise AccessError(_('Only Live Chat managers can change LINE conversation fields.'))
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        self._line_check_protected_fields(vals_list)
+        return super().create(vals_list)
+
+    def write(self, vals):
+        self._line_check_protected_fields([vals])
+        return super().write(vals)
 
     # Bounded so this column does not grow forever on a long-lived
     # conversation; LINE redelivers shortly after the original attempt, so
@@ -158,15 +186,14 @@ class DiscussChannel(models.Model):
                 _logger.info('LINE: Generated access_token for attachment id=%s', attachment.id)
 
             att_token = attachment.access_token
-            _logger.info('LINE: Processing attachment id=%s, name=%s, mimetype=%s, access_token=%s',
-                        attachment.id, attachment.name, mimetype, att_token[:10] if att_token else 'None')
+            _logger.info('LINE: Processing attachment id=%s, mimetype=%s', attachment.id, mimetype)
 
             if mimetype.startswith('image/'):
                 # Image message - use /web/image/ endpoint for better compatibility
                 image_url = f'{base_url}/web/image/{attachment.id}?access_token={att_token}'
                 image_url = self._ensure_https_url(image_url)
                 if image_url:
-                    _logger.info('LINE: Sending image URL=%s', image_url)
+                    _logger.info('LINE: Sending image attachment id=%s', attachment.id)
                     messages.append(line_api.build_image_message(image_url))
                 else:
                     _logger.warning('LINE: Cannot send image - URL must be HTTPS')
@@ -183,7 +210,7 @@ class DiscussChannel(models.Model):
                     # Use a default preview - use first frame or static image
                     preview_url = f'{base_url}/woow_odoo_livechat_line/static/img/video_preview.png'
                     preview_url = self._ensure_https_url(preview_url) or video_url
-                    _logger.info('LINE: Sending video URL=%s, preview=%s', video_url, preview_url)
+                    _logger.info('LINE: Sending video attachment id=%s', attachment.id)
                     messages.append(line_api.build_video_message(video_url, preview_url))
                 else:
                     _logger.warning('LINE: Cannot send video - URL must be HTTPS')
@@ -197,7 +224,7 @@ class DiscussChannel(models.Model):
                 audio_url = self._ensure_https_url(audio_url)
                 if audio_url:
                     duration_ms = 60000  # Default 60 seconds
-                    _logger.info('LINE: Sending audio URL=%s', audio_url)
+                    _logger.info('LINE: Sending audio attachment id=%s', attachment.id)
                     messages.append(line_api.build_audio_message(audio_url, duration_ms))
                 else:
                     _logger.warning('LINE: Cannot send audio - URL must be HTTPS')
@@ -210,7 +237,7 @@ class DiscussChannel(models.Model):
                 file_url = f'{base_url}/web/content/{attachment.id}?access_token={att_token}&download=true'
                 file_url = self._ensure_https_url(file_url)
 
-                _logger.info('LINE: Sending file as Flex Message card, name=%s, url=%s', attachment.name, file_url)
+                _logger.info('LINE: Sending file attachment id=%s as Flex Message card', attachment.id)
                 messages.append(line_api.build_file_message(
                     attachment.name,
                     file_url,
