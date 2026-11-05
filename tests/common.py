@@ -135,10 +135,25 @@ def mock_line_content_response(content=None, content_type='image/png'):
 
 # ── URL-based request routing ──────────────────────────────────────
 
+def mock_line_reply_response(status_code=400):
+    """Mock requests.Response for LINE Reply API (default: token rejected)."""
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.text = '{}' if status_code == 200 else '{"message":"Invalid reply token"}'
+    return resp
+
+
 def route_mock_post(url, **kwargs):
-    """Route mocked POST requests by URL pattern."""
+    """Route mocked POST requests by URL pattern.
+
+    Reply requests are rejected like an expired/used token, so tests that
+    receive a webhook message and then post a reply keep exercising the push
+    path; tests/test_reply_token_first.py covers successful replies.
+    """
     if 'oauth/accessToken' in url:
         return mock_line_token_response()
+    if '/bot/message/reply' in url:
+        return mock_line_reply_response()
     if '/bot/message/push' in url:
         return mock_line_push_response(success=True)
     raise ValueError(f'Unexpected POST to {url}')
