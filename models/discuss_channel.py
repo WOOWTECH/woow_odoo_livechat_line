@@ -33,6 +33,15 @@ class DiscussChannel(models.Model):
              'this conversation, most-recent last. Used to make webhook '
              'redelivery idempotent — see _line_try_claim_message.',
     )
+    # Reply token of the customer's latest LINE event (message or postback)
+    # and when Odoo received it. LINE does not count reply messages toward the
+    # official account's monthly message quota (push messages are counted), so
+    # the first reply within the token's lifetime goes out as a free reply.
+    # Written and consumed with plain SQL (_line_store_reply_token /
+    # _line_claim_reply_token) so a busy conversation does not trigger
+    # discuss.channel write side effects on every incoming message.
+    line_reply_token = fields.Char(copy=False, groups='base.group_system')
+    line_reply_token_at = fields.Datetime(copy=False, groups='base.group_system')
 
     # The fields that make a channel "a LINE conversation". Whoever can set
     # them can make Odoo push messages to any LINE user id through the
@@ -42,7 +51,7 @@ class DiscussChannel(models.Model):
     # Live Chat managers may set them.
     _LINE_PROTECTED_FIELDS = frozenset((
         'line_user_id', 'line_display_name', 'line_picture_url',
-        'line_processed_message_ids',
+        'line_processed_message_ids', 'line_reply_token', 'line_reply_token_at',
     ))
 
     def _line_check_protected_fields(self, vals_list):
@@ -105,6 +114,86 @@ class DiscussChannel(models.Model):
             (json.dumps(processed), self.id),
         )
         return True
+
+    # LINE: "Reply tokens must be used within one minute after receiving the
+    # webhook" (Messaging API reference, Send reply message). Keep a margin.
+    _LINE_REPLY_TOKEN_TTL_DEFAULT = 50
+    _LINE_REPLY_TOKEN_TTL_PARAM = 'woow_odoo_livechat_line.reply_token_ttl'
+
+    def _line_reply_token_ttl(self):
+        """Seconds a stored reply token may still be used; 0 disables replies."""
+        raw = self.env['ir.config_parameter'].sudo().get_param(
+            self._LINE_REPLY_TOKEN_TTL_PARAM, self._LINE_REPLY_TOKEN_TTL_DEFAULT)
+        try:
+            return max(0, min(int(raw), 55))
+        except (TypeError, ValueError):
+            return self._LINE_REPLY_TOKEN_TTL_DEFAULT
+
+    def _line_store_reply_token(self, reply_token):
+        """Remember the reply token of an incoming LINE event (overwrites the
+        previous one; only the newest event can still be replied to)."""
+        self.ensure_one()
+        if not reply_token or not isinstance(reply_token, str) or len(reply_token) > 255:
+            return
+        self.env.cr.execute(
+            "UPDATE discuss_channel SET line_reply_token = %s, "
+            "line_reply_token_at = (clock_timestamp() AT TIME ZONE 'UTC') WHERE id = %s",
+            (reply_token, self.id),
+        )
+        self.invalidate_recordset(['line_reply_token', 'line_reply_token_at'])
+
+    def _line_claim_reply_token(self):
+        """Atomically take the stored reply token if it is still fresh.
+
+        The token is cleared whether or not it is fresh: a reply token can be
+        used once, so two Odoo messages posted at the same time must not both
+        try it (the row lock serialises concurrent claims).
+
+        Returns:
+            str or None: the token to use for a free reply, or None to push.
+        """
+        self.ensure_one()
+        ttl = self._line_reply_token_ttl()
+        self.env.cr.execute(
+            "WITH old AS ("
+            "  SELECT id, line_reply_token AS token, "
+            "         EXTRACT(EPOCH FROM (clock_timestamp() AT TIME ZONE 'UTC') - line_reply_token_at) AS age "
+            "  FROM discuss_channel WHERE id = %s AND line_reply_token IS NOT NULL FOR UPDATE"
+            ") UPDATE discuss_channel c SET line_reply_token = NULL, line_reply_token_at = NULL "
+            "FROM old WHERE c.id = old.id RETURNING old.token, old.age",
+            (self.id,),
+        )
+        row = self.env.cr.fetchone()
+        self.invalidate_recordset(['line_reply_token', 'line_reply_token_at'])
+        if not row or ttl <= 0:
+            return None
+        token, age = row
+        if age is None or age < 0 or age > ttl:
+            return None
+        return token
+
+    _LINE_MONTHLY_LIMIT_NOTICE = (
+        '本月 LINE 官方帳號的訊息額度已用完（HTTP 429），這則推播送不出去。'
+        '客人傳訊息或按選單後 1 分鐘內送出的回覆不受影響（回覆不計額度）；'
+        '其他訊息要等下個月額度重置，或到 LINE Official Account Manager 升級方案。'
+    )
+    # One monthly-limit notice per conversation per this many hours, so an
+    # exhausted quota does not flood the channel with identical warnings.
+    _LINE_MONTHLY_LIMIT_NOTICE_HOURS = 6
+
+    @staticmethod
+    def _line_is_monthly_limit(status_code, resp_text):
+        return status_code == 429 and 'monthly limit' in str(resp_text or '').lower()
+
+    def _post_line_monthly_limit_notice(self):
+        self.ensure_one()
+        since = fields.Datetime.subtract(fields.Datetime.now(), hours=self._LINE_MONTHLY_LIMIT_NOTICE_HOURS)
+        recent = self.env['mail.message'].sudo().search_count([
+            ('model', '=', 'discuss.channel'), ('res_id', '=', self.id),
+            ('date', '>=', since), ('body', 'ilike', '訊息額度已用完'),
+        ])
+        if not recent:
+            self._post_line_delivery_failure(self._LINE_MONTHLY_LIMIT_NOTICE)
 
     def _post_line_delivery_failure(self, reason):
         """Post a visible warning in the channel when a reply failed to reach LINE.
@@ -244,20 +333,41 @@ class DiscussChannel(models.Model):
                     attachment.file_size
                 ))
 
-        # Send messages to LINE (max 5 messages per push)
+        # Send messages to LINE (max 5 messages per request). The first batch
+        # goes out as a free reply when the customer wrote or tapped the menu
+        # within the reply token's lifetime; everything else is a push, which
+        # counts toward the official account's monthly message quota.
         if messages:
-            # LINE allows max 5 messages per push request
+            reply_token = self._line_claim_reply_token()
+            can_reply = hasattr(line_api, '_reply_raw')
             for i in range(0, len(messages), 5):
                 batch = messages[i:i + 5]
+                if i == 0 and reply_token and can_reply:
+                    replied, reply_status = line_api._reply_raw(access_token, reply_token, batch)
+                    if replied:
+                        _logger.info('LINE: Replied with %s messages to user %s (reply token, not counted)',
+                                     len(batch), self.line_user_id)
+                        continue
+                    if not reply_status:
+                        # No response: LINE may or may not have delivered the
+                        # reply, so pushing again could show it twice.
+                        _logger.error('LINE: Reply to user %s got no response', self.line_user_id)
+                        self._post_line_delivery_failure('LINE API 無回應（網路錯誤），客人可能沒有收到。')
+                        continue
+                    _logger.info('LINE: Reply token rejected (HTTP %s) for user %s, pushing instead',
+                                 reply_status, self.line_user_id)
                 # Call _push_message_raw() directly instead of the public
                 # push_message() wrapper: same HTTP request, but it also
                 # gives us the status code so the failure notice below can
                 # say something more useful than "it failed".
-                success, status_code, _resp_text = line_api._push_message_raw(
+                success, status_code, resp_text = line_api._push_message_raw(
                     access_token, self.line_user_id, batch,
                 )
                 if success:
                     _logger.info('LINE: Sent %s messages to user %s', len(batch), self.line_user_id)
+                elif self._line_is_monthly_limit(status_code, resp_text):
+                    _logger.error('LINE: Monthly message limit reached, push to user %s refused', self.line_user_id)
+                    self._post_line_monthly_limit_notice()
                 else:
                     _logger.error('LINE: Failed to send messages to user %s', self.line_user_id)
                     self._post_line_delivery_failure(

@@ -885,6 +885,15 @@ woow_odoo_line_liff webhook (handles ALL events)
 
 ---
 
+## Reply Tokens First (18.0.2.0.5)
+
+LINE counts push messages toward the official account's monthly message quota; reply messages are not counted. The webhook keeps the reply token of the customer's latest message or postback (rich-menu tap) on the conversation (`line_reply_token`, `line_reply_token_at`, system-admin only, written with SQL). `_notify_line_user` claims it atomically and sends the first batch with the Reply API when it is younger than `woow_odoo_livechat_line.reply_token_ttl` seconds (default 50, max 55, 0 disables).
+
+- Rejected token (used, expired, 400): falls back to push.
+- No response from LINE: no push (the reply may have been delivered); a warning is posted instead.
+- Push refused with HTTP 429 "monthly limit": one clear notice per conversation per 6 hours.
+- Postbacks only refresh the token of an existing LINE conversation; they never create guests, channels or messages.
+
 ## Webhook Retries & Deduplication
 
 LINE retries webhook delivery if the endpoint returns a non-200 status or times out (60 seconds). This module **always returns HTTP 200** (even on internal errors) to prevent retries.

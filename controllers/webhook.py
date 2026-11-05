@@ -94,6 +94,8 @@ class LineWebhookController(http.Controller):
             self._handle_message_event(event, livechat_channel)
         elif event_type == 'follow':
             self._handle_follow_event(event, livechat_channel)
+        elif event_type == 'postback':
+            self._handle_postback_event(event, livechat_channel)
         elif event_type == 'unfollow':
             _logger.info('LINE webhook: User unfollowed channel')
         else:
@@ -162,8 +164,35 @@ class LineWebhookController(http.Controller):
             _logger.info('LINE webhook: Duplicate message id=%s ignored (redelivery)', message_id)
             return
 
+        # Keep the reply token: the first Odoo reply within a minute (operator
+        # or AI) is then sent as a free LINE reply instead of a counted push.
+        discuss_channel._line_store_reply_token(reply_token)
+
         # Process message based on type
         self._create_message(message, message_type, discuss_channel, guest, livechat_channel)
+
+    def _handle_postback_event(self, event, livechat_channel):
+        """Remember the reply token of a postback (rich menu / Flex button).
+
+        A postback posts nothing in the conversation, but whatever the tap
+        triggers (for example an n8n report posted back into the
+        conversation) can then go out as a free reply. Only existing LINE
+        conversations are updated; a tap never creates guests or channels.
+
+        Args:
+            event: LINE postback event dict.
+            livechat_channel: im_livechat.channel record.
+        """
+        line_user_id = (event.get('source') or {}).get('userId')
+        reply_token = event.get('replyToken')
+        if not line_user_id or not reply_token:
+            return
+        discuss_channel = request.env['discuss.channel'].sudo().search([
+            ('line_user_id', '=', line_user_id),
+            ('livechat_channel_id', '=', livechat_channel.id),
+        ], limit=1)
+        if discuss_channel:
+            discuss_channel._line_store_reply_token(reply_token)
 
     def _get_or_create_guest(self, line_user_id, livechat_channel):
         """Get or create a mail.guest record for LINE user.
